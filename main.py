@@ -11,3 +11,4 @@ if __name__ == '__main__':
     bot = Bot(token)
 
     bot.connect()
+    bot.get_id()
