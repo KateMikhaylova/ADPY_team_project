@@ -15,8 +15,8 @@ connect_info = {'drivername': 'postgresql+psycopg2',
                 }
 
 
-def create_db(database_name):
-    db = Connect('postgres', '24081986', database_name)
+def create_db(connect):
+    db = Connect(connect['username'], connect['password'], connect['database'])
     res, text = db.connect()
     if res[0]:
         res, text = db.create_db()
