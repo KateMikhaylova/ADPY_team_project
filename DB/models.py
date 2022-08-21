@@ -88,5 +88,9 @@ class Photo(Base):
 
 
 def create_tables(engine):
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
+    try:
+        Base.metadata.drop_all(engine)
+        Base.metadata.create_all(engine)
+        return True
+    except:
+        return False
