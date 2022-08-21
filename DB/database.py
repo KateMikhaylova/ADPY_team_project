@@ -24,7 +24,7 @@ connect_info = {'drivername': 'postgresql+psycopg2',
 
 def create_db(con: dict) -> bool:
     '''
-    :param connect: dictionary with database connection parameters
+    :param con: dictionary with database connection parameters
     :return: If the database is created returns True
     '''
     db = Connect(con['username'], con['password'], con['database'])
