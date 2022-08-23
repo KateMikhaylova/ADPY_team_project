@@ -31,6 +31,7 @@ class FoundUser(Base):
     age = sq.Column(sq.Integer, nullable=False)
     id_gender = sq.Column(sq.Integer, sq.ForeignKey('gender.id'), nullable=False)
     id_city = sq.Column(sq.Integer, sq.ForeignKey('city.id'), nullable=False)
+    id_photo = sq.Column(sq.Integer, sq.ForeignKey('photo.id'), nullable=False)
     city = relationship('City', backref='found_user')
     gender = relationship('Gender', backref='found_user')
     hobby = relationship('Hobby', backref='found_user')
@@ -82,6 +83,7 @@ class Photo(Base):
     __tablename__ = 'photo'
 
     id = sq.Column(sq.Integer, primary_key=True, unique=True, autoincrement=True)
+    id_photo = sq.Column(sq.Text, nullable=False)
     link = sq.Column(sq.Text, nullable=False)
     amount = sq.Column(sq.Integer, nullable=True)
     id_found_user = sq.Column(sq.Integer, sq.ForeignKey('found_user.id'), nullable=True)
