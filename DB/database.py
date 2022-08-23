@@ -9,7 +9,7 @@ from DB.models import create_tables
 
 connect_info = {'drivername': 'postgresql+psycopg2',
                 'username': 'postgres',
-                'password': '24081986',
+                'password': 'password',
                 'host': 'localhost',
                 'port': 5432,
                 'database': 'vkinder'
