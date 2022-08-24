@@ -17,7 +17,7 @@ connect_info = {'drivername': 'postgresql+psycopg2',
 
 
 class DB:
-    '''
+    """
     Create a new :class: DB
 
     The standard calling form consists in sending :ref: a dictionary with data on connection to the database.
@@ -29,7 +29,7 @@ class DB:
     port - the connection port.
     database - the name of the database.
     ---------------------------------------
-    '''
+    """
 
     def __init__(self, **info):
         self.info = info
@@ -37,12 +37,12 @@ class DB:
         self.engine = sqlalchemy.create_engine(dsn)
 
     def newdatabase(self) -> (bool, psycopg2.Error):
-        '''
+        """
         creating a new database.
 
         using psycopg2, a connection to the database is made
         and a new database is created using a query.
-        '''
+        """
         try:
             self.connection = psycopg2.connect(user=self.info['username'],
                                                password=self.info['password'],
@@ -72,13 +72,13 @@ class DB:
         return self.engine
 
     def createtable(self, engine: sqlalchemy.engine.base.Engine) -> bool:
-        '''
+        """
         From the file models.py we get a function for
         creating tables, with which we create the tables
         specified in the file in the database models.py
         :param engine:  sqlalchemy.engine.base.Engine
         :return: was it possible to create tables
-        '''
+        """
         try:
             res = create_tables(engine)
             if res:
@@ -89,11 +89,11 @@ class DB:
             return False
 
     def write(self, person: dict) -> bool:
-        '''
+        """
 
         :param person:  dictionary with data per person
         :return: true/false was the recording successful
-        '''
+        """
         Session = sessionmaker(bind=self.engine)
         session = Session()
 
@@ -101,12 +101,12 @@ class DB:
         return True
 
     def read(self, requirement: dict) -> tuple:
-        '''
+        """
         In the method, we get a dictionary with
         query parameters to search in the database.
         :param: requirement: dict
         :return: tuple
-        '''
+        """
         Session = sessionmaker(bind=self.engine)
         session = Session()
 
