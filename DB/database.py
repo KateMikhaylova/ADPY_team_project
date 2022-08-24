@@ -5,7 +5,7 @@ from psycopg2 import Error
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from sqlalchemy.orm import sessionmaker
 
-from DB.models import create_tables
+from DB.models import *
 
 connect_info = {'drivername': 'postgresql+psycopg2',
                 'username': 'postgres',
@@ -88,19 +88,34 @@ class DB:
         except:
             return False
 
-    def write(self, person: dict) -> bool:
+    def writeFoundUser(self, person: dict) -> bool:
         """
-
+        Writing to the database of the found user
         :param person:  dictionary with data per person
+        'firstname': person's name
+        'lastname': person's surname
+        'age': age of the person
+        'city': person 's city
+        'photos': list of id photos of a person
+        'gender': gender of the person
         :return: true/false was the recording successful
         """
         Session = sessionmaker(bind=self.engine)
         session = Session()
-
+        # 1 мы ищем город этого человека, если его нет добавляем, если есть получаем id
+        # 2 мы ищем пол этого человека, если нет добавляем, если есть получаем ID.
+        # 3 записываем список фотографий И получаем их id
+        # 4 нужна новая таблица многие ко многим фотографии-найденные пользователи.
+        query = FoundUser(first_name=person['firstname'],
+                          last_name=person['lastname'],
+                          id_gender=1,
+                          id_city=1)
+        session.add(query)
+        session.commit()
         session.close()
         return True
 
-    def read(self, requirement: dict) -> tuple:
+    def readFoundUser(self, requirement: dict) -> tuple:
         """
         In the method, we get a dictionary with
         query parameters to search in the database.
@@ -124,8 +139,16 @@ def main():
             work.createtable(engine)
         else:
             print(test_new_db)
+            print('НИЧЕГО НЕ РАБОТАЕТ!')
             return False
-
+    person = {'firstname': 'Лена',
+              'lastname': 'Андреева',
+              'age': '37',
+              'city': 'Дудинка',
+              'photos': [('457539545_456239020', (15, 0)), ('457539545_456239024', (12, 0)),
+                         ('457539545_456239045', (7, 0))]
+              }
+    work.writeFoundUser(person)
 
 if __name__ == '__main__':
     main()

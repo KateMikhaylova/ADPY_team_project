@@ -8,8 +8,8 @@ class User(Base):
     __tablename__ = 'user'
 
     id = sq.Column(sq.Integer, primary_key=True, unique=True, autoincrement=True)
-    surname = sq.Column(sq.Text, nullable=False)
-    name = sq.Column(sq.Text, nullable=False)
+    last_name = sq.Column(sq.Text, nullable=False)
+    first_name = sq.Column(sq.Text, nullable=False)
     patronymic = sq.Column(sq.Text, nullable=True)
     age = sq.Column(sq.Integer, nullable=False)
     id_gender = sq.Column(sq.Integer, sq.ForeignKey('gender.id'), nullable=False)
@@ -25,8 +25,8 @@ class FoundUser(Base):
     __tablename__ = 'found_user'
 
     id = sq.Column(sq.Integer, primary_key=True, unique=True, autoincrement=True)
-    surname = sq.Column(sq.Text, nullable=False)
-    name = sq.Column(sq.Text, nullable=False)
+    last_name = sq.Column(sq.Text, nullable=False)
+    first_name = sq.Column(sq.Text, nullable=False)
     patronymic = sq.Column(sq.Text, nullable=True)
     age = sq.Column(sq.Integer, nullable=False)
     id_gender = sq.Column(sq.Integer, sq.ForeignKey('gender.id'), nullable=False)
