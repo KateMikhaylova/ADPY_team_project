@@ -1,7 +1,225 @@
+import vk_api
 import requests
+import configparser
+import datetime
+
+from pprint import pprint
+from time import sleep
 
 
-class Vkontakte:
+class VkontakteApi:
+    """
+    Class for interaction with Vkontakte API
 
-    def __init__(self, token):
-        self.token = token
+    Attributes:
+        user_token: str
+                    users token used to get access to VkApi methods
+        vk_session: class vk_api.vk_api.VkApi object
+                    used to create vk attrubute and to create VkRequestsPool object
+        vk:         class vk_api.vk_api.VkApiMethod object
+                    used to call VkApi methods
+
+    Methods:
+        get_user_info: gets info on VK user based in his id
+        determinate_search_parameters: staticmethod, returns parameters for search (same age and city and opposite gender)
+        search_people: gets list of VK users with open profiles based on indicated gender, city and age
+        search_many_people: same as previous, but uses Vk Request Pool to get more search results
+        get_3_photos: gets users profile and marked photos and takes three most liked of them
+        like_photo: likes requested photo
+        delete_like_photo: deletes likes from requested photo
+    """
+
+    def __init__(self, user_token: str) -> None:
+        """
+        Sets attributes user_token, vk_session and vk for object VkontakteApi
+        :param user_token: str, users token with necessary rights ('wall' rights are obligatory)
+        """
+        self.user_token = user_token
+        self.vk_session = vk_api.VkApi(token=self.user_token)
+        self.vk = self.vk_session.get_api()
+
+    def get_user_info(self, user_id: int) -> tuple:
+        """
+        Gets info on VK user based in his id
+        :param user_id: integer, unique users id
+        :return: tuple with city id, city name, gender id, gender name and age
+        """
+        response = self.vk.users.get(user_ids=user_id, fields='bdate, city, sex')
+
+        user_city_id = response[0]['city']['id']
+        user_city_title = response[0]['city']['title']
+
+        user_gender_id = response[0]['sex']
+        if user_gender_id == 1:
+            user_gender = 'ж'
+        elif user_gender_id == 2:
+            user_gender = 'м'
+        else:
+            user_gender = None
+
+        user_birthday_date = datetime.datetime.strptime(response[0]['bdate'], '%d.%m.%Y').date()
+        user_age = int((datetime.date.today() - user_birthday_date).days//365.25)
+
+        return user_city_id, user_city_title, user_gender_id, user_gender, user_age
+
+    @staticmethod
+    def determinate_search_parameters(user_parameters_tuple: tuple) -> tuple:
+        """
+        Staticmethod, returns parameters for search (same age and city and opposite gender)
+        :param user_parameters_tuple: tuple with user information
+        :return: tuple with search parameters: city id, gender id, age
+        """
+
+        search_city_id = user_parameters_tuple[0]
+
+        if user_parameters_tuple[2] == 1:
+            search_gender_id = 2
+        elif user_parameters_tuple[2] == 2:
+            search_gender_id = 1
+        else:
+            search_gender_id = 0
+
+        search_age = user_parameters_tuple[4]
+
+        return search_city_id, search_gender_id, search_age
+
+    def search_people(self, city_id: int, sex: int, age: int) -> list:
+        """
+        Gets list of VK users with open profiles based on indicated gender, city and age
+        :param city_id: integer, city id used in VK database
+        :param sex: integer, gender id used in VK database
+        :param age: integer, age of searched users
+        :return: list of dicts with users information
+        """
+
+        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=20,
+                                        fields='bdate, city, sex,can_send_friend_request, can_write_private_message, relation')
+
+        return [person for person in response['items'] if not person['is_closed']]
+
+    def search_many_people(self, city_id: int, sex: int, age: int) -> list:
+        """
+        Gets list of VK users with open profiles based on indicated gender, city and age. Uses Vk Request Pool to get
+        more search results
+        :param city_id: integer, city id used in VK database
+        :param sex: integer, gender id used in VK database
+        :param age: integer, age of searched users
+        :return: list of dicts with users information
+        """
+        people = {}
+
+        with vk_api.VkRequestsPool(self.vk_session) as pool:
+            for birth_month in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]: # Можно добавить второй цикл по дням, но такое количество результатов очень долго получать и обрабатывать
+                people[birth_month] = pool.method('users.search',
+                                                  {'age_from': age,
+                                                   'birth_month': birth_month,
+                                                   'count': 1000, 'sex': sex, 'city': city_id,
+                                                   'age_to': age,
+                                                   'fields': 'bdate, city, sex,can_send_friend_request, can_write_private_message, relation'})
+
+        people_list = []
+        for value in people.values():
+            people_list.extend(value.result['items'])
+
+        return [person for person in people_list if not person['is_closed']]
+
+    def get_3_photos(self, user_id: int) -> list:
+        """
+        Gets users profile and marked photos and takes three most liked of them
+        :param user_id: users id to search photos
+        :return: list of tuples with photo id and quantity of likes and whether token user has already liked photo or not
+        """
+        response = self.vk.photos.get(owner_id=user_id, album_id='profile', extended=1)
+
+        photo_dict = {}
+        for photo in response['items']:
+            photo_dict[f"{photo['owner_id']}_{photo['id']}"] = (photo['likes']['count'], photo['likes']['user_likes'])
+
+        # Get photos where user is marked
+
+        # Query via vk_api demands try except statement in case access to marked photos is denied
+        # In request library this case can be proceeded without try except statement
+        # try:
+        #     response = self.vk.photos.getUserPhotos(user_id=user_id, extended=1)
+        # except vk_api.exceptions.ApiError:
+        #     response = {}
+        # if response:
+        #     for photo in response['items']:
+        #         photo_dict[f"{photo['owner_id']}_{photo['id']}"] = photo['likes']['count']
+
+        URL = 'https://api.vk.com/method/photos.getUserPhotos'
+        params = {'user_id': user_id, 'extended': '1', 'access_token': self.user_token, 'v': '5.131'}
+        response = requests.get(URL, params=params).json()
+
+        if 'error' in response:
+            pass
+        else:
+            for photo in response['response']['items']:
+                photo_dict[f"{photo['owner_id']}_{photo['id']}"] = (photo['likes']['count'], photo['likes']['user_likes'])
+
+        three_photos = sorted(photo_dict.items(), key=lambda x: x[1][0], reverse=True)[0:3]
+
+        return three_photos
+
+    def like_photo(self, owner_id: int, photo_id: int) -> bool:
+        """
+        Likes requested photo
+        :param owner_id: id of user who published photo (in case if marked photo it may not be the same as searched user id)
+        :param photo_id: id of photo
+        :return: bool, True if method returned information on likes quantity, otherwise False
+        """
+
+        response = self.vk.likes.add(type='photo', owner_id=owner_id, item_id=photo_id)
+        if 'likes' in response:
+            return True
+        else:
+            return False
+
+    def delete_like_photo(self, owner_id: int, photo_id: int) -> bool:
+        """
+        Deletes likes from requested photo
+        :param owner_id: id of user who published photo (in case if marked photo it may not be the same as searched user id)
+        :param photo_id: id of photo
+        :return: bool, True if method returned information on likes quantity, otherwise False
+        """
+
+        response = self.vk.likes.delete(type='photo', owner_id=owner_id, item_id=photo_id)
+        if 'likes' in response:
+            return True
+        else:
+            return False
+
+
+if __name__ == '__main__':
+
+    config = configparser.ConfigParser()
+    config.read('settings.ini')
+    user_token = config['VK']['token']
+
+    vkontakte = VkontakteApi(user_token)
+
+    user_info = vkontakte.get_user_info(1)
+    print('\nИнфа на Павла Дурова: город, пол, возраст', user_info)
+
+    search_info = vkontakte.determinate_search_parameters(user_info)
+    print('\nПараметры для невесты Павла Дурова: город, пол, возраст', search_info)
+
+    people = vkontakte.search_people(*search_info)
+    print('\nНашли невест для Павла Дурова', len(people))
+    pprint(people)
+    print()
+
+    # #Тут будет очень много невест, несколько тысяч
+    # people = vkontakte.search_many_people(*search_info)
+    # print(len(people))
+    # # печатать их прям вообще не рекомендую
+    # # pprint(people)
+
+    print('\nЛучшие фотографии невест:')
+    for person in people:
+        print(vkontakte.get_3_photos(person['id']))
+        sleep(0.33)
+
+    # Желающие могут лайкнуть аву Дурова и удалить лайк
+    # print(vkontakte.like_photo(1, 456264771))
+    # print(vkontakte.delete_like_photo(1, 456264771))
