@@ -25,8 +25,9 @@ class VkontakteApi:
         search_people: gets list of VK users with open profiles based on indicated gender, city and age
         search_many_people: same as previous, but uses Vk Request Pool to get more search results
         get_3_photos: gets users profile and marked photos and takes three most liked of them
-        like_photo: likes requested photo
-        delete_like_photo: deletes likes from requested photo
+        like_photo: likes requested photo by token user
+        delete_like_photo: deletes likes from requested photo by token user
+        check_like_presence: checks whether photo is liked by token user or not
     """
 
     def __init__(self, user_token: str) -> None:
@@ -57,7 +58,9 @@ class VkontakteApi:
         else:
             user_gender = None
 
-        user_birthday_date = datetime.datetime.strptime(response[0]['bdate'], '%d.%m.%Y').date()
+        birth_day = response[0]['bdate'].split('.') # Если др скрыт, все ломается
+
+        user_birthday_date = datetime.date(int(birth_day[2]), int(birth_day[1]), int(birth_day[0]))
         user_age = int((datetime.date.today() - user_birthday_date).days//365.25)
 
         return user_city_id, user_city_title, user_gender_id, user_gender, user_age
@@ -92,7 +95,7 @@ class VkontakteApi:
         :return: list of dicts with users information
         """
 
-        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=20,
+        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=10,
                                         fields='bdate, city, sex,can_send_friend_request, can_write_private_message, relation')
 
         return [person for person in response['items'] if not person['is_closed']]
@@ -163,7 +166,7 @@ class VkontakteApi:
 
     def like_photo(self, owner_id: int, photo_id: int) -> bool:
         """
-        Likes requested photo
+        Likes requested photo by token user
         :param owner_id: id of user who published photo (in case if marked photo it may not be the same as searched user id)
         :param photo_id: id of photo
         :return: bool, True if method returned information on likes quantity, otherwise False
@@ -177,7 +180,7 @@ class VkontakteApi:
 
     def delete_like_photo(self, owner_id: int, photo_id: int) -> bool:
         """
-        Deletes likes from requested photo
+        Deletes likes from requested photo by token user
         :param owner_id: id of user who published photo (in case if marked photo it may not be the same as searched user id)
         :param photo_id: id of photo
         :return: bool, True if method returned information on likes quantity, otherwise False
@@ -185,6 +188,18 @@ class VkontakteApi:
 
         response = self.vk.likes.delete(type='photo', owner_id=owner_id, item_id=photo_id)
         if 'likes' in response:
+            return True
+        else:
+            return False
+
+    def check_like_presence(self, photo: str) -> bool:
+        """
+        Сhecks whether photo liked by token user or not
+        :param photo: photo id
+        :return: True if like present, otherwise false
+        """
+        response = self.vk.photos.getById(photos=photo, extended=1)
+        if response[0]['likes']['user_likes']:
             return True
         else:
             return False
@@ -197,29 +212,30 @@ if __name__ == '__main__':
     user_token = config['VK']['token']
 
     vkontakte = VkontakteApi(user_token)
-
-    user_info = vkontakte.get_user_info(1)
-    print('\nИнфа на Павла Дурова: город, пол, возраст', user_info)
-
-    search_info = vkontakte.determinate_search_parameters(user_info)
-    print('\nПараметры для невесты Павла Дурова: город, пол, возраст', search_info)
-
-    people = vkontakte.search_people(*search_info)
-    print('\nНашли невест для Павла Дурова', len(people))
-    pprint(people)
-    print()
-
-    # #Тут будет очень много невест, несколько тысяч
-    # people = vkontakte.search_many_people(*search_info)
-    # print(len(people))
-    # # печатать их прям вообще не рекомендую
-    # # pprint(people)
-
-    print('\nЛучшие фотографии невест:')
-    for person in people:
-        print(vkontakte.get_3_photos(person['id']))
-        sleep(0.33)
-
-    # Желающие могут лайкнуть аву Дурова и удалить лайк
-    # print(vkontakte.like_photo(1, 456264771))
-    # print(vkontakte.delete_like_photo(1, 456264771))
+    #
+    # user_info = vkontakte.get_user_info(1)
+    # print('\nИнфа на Павла Дурова: город, пол, возраст', user_info)
+    #
+    # search_info = vkontakte.determinate_search_parameters(user_info)
+    # print('\nПараметры для невесты Павла Дурова: город, пол, возраст', search_info)
+    #
+    # people = vkontakte.search_people(*search_info)
+    # print('\nНашли невест для Павла Дурова', len(people))
+    # pprint(people)
+    # print()
+    #
+    # # #Тут будет очень много невест, несколько тысяч
+    # # people = vkontakte.search_many_people(*search_info)
+    # # print(len(people))
+    # # # печатать их прям вообще не рекомендую
+    # # # pprint(people)
+    #
+    # print('\nЛучшие фотографии невест:')
+    # for person in people:
+    #     print(vkontakte.get_3_photos(person['id']))
+    #     sleep(0.33)
+    #
+    # # Желающие могут лайкнуть аву Дурова и удалить лайк
+    # # print(vkontakte.like_photo(1, 456264771))
+    # # print(vkontakte.delete_like_photo(1, 456264771))
+    print(vkontakte.check_like_presence('1_376599151'))
