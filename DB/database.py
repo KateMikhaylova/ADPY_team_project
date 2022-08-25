@@ -9,7 +9,7 @@ from DB.models import *
 
 connect_info = {'drivername': 'postgresql+psycopg2',
                 'username': 'postgres',
-                'password': 'password',
+                'password': '24081986',
                 'host': 'localhost',
                 'port': 5432,
                 'database': 'vkinder'
@@ -50,22 +50,23 @@ class DB:
                                                port=self.info['port'])
 
             self.connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-            self.__create_db()
+            if self.__create_db():
+                return True
         except (Exception, Error):
-            return False, Error
+            return False
 
     def __create_db(self):
         try:
             self.cursor = self.connection.cursor()
             self.cursor.execute('create database ' + self.info['database'])
-            self.__close()
+            if self.__close():
+                return True
         except (Exception, Error):
-            return False, Error
+            return False
 
     def __close(self):
         self.cursor.close()
         self.connection.close()
-        print('Соединение закрыто')
         return True
 
     def preparation(self) -> sqlalchemy.engine.base.Engine:
@@ -91,6 +92,10 @@ class DB:
     def writeFoundUser(self, person: dict) -> bool:
         """
         Writing to the database of the found user
+        At the beginning, we get information about the city id and gender id,
+        If there are such records in the database, then we get these IDs,
+        if not, then we create such data, assign the id, and then.
+        Taking into account the received data, we record the user.
         :param person:  dictionary with data per person
         'firstname': person's name
         'lastname': person's surname
@@ -100,16 +105,24 @@ class DB:
         'gender': gender of the person
         :return: true/false was the recording successful
         """
+
+        q = self.__query_city(person['city'])
+        if not q:
+            self.__add_city(person['city'])
+        id_city = self.__query_city(person['city'])
+        g = self.__query_gender(person['gender'])
+        if not g:
+            self.__add_gender(person['gender'])
+        id_gender = self.__query_gender(person['gender'])
+
         Session = sessionmaker(bind=self.engine)
         session = Session()
-        # 1 мы ищем город этого человека, если его нет добавляем, если есть получаем id
-        # 2 мы ищем пол этого человека, если нет добавляем, если есть получаем ID.
-        # 3 записываем список фотографий И получаем их id
-        # 4 нужна новая таблица многие ко многим фотографии-найденные пользователи.
-        query = FoundUser(first_name=person['firstname'],
+        query = FoundUser(id=person['id_user'],
+                          first_name=person['firstname'],
                           last_name=person['lastname'],
-                          id_gender=1,
-                          id_city=1)
+                          id_gender=id_gender,
+                          id_city=id_city,
+                          age=person['age'])
         session.add(query)
         session.commit()
         session.close()
@@ -128,6 +141,46 @@ class DB:
         session.close()
         return ()
 
+    def __query_gender(self, gender):
+        Session = sessionmaker(bind=self.engine)
+        session = Session()
+        query = session.query(Gender).filter(Gender.gender_name == gender).all()
+        session.close()
+        for q in query:
+            return q.id
+
+    def __query_city(self, city):
+        Session = sessionmaker(bind=self.engine)
+        session = Session()
+        query = session.query(City).filter(City.city_name == city).all()
+        session.close()
+        for q in query:
+            return q.id
+
+    def __add_gender(self, gender):
+        try:
+            Session = sessionmaker(bind=self.engine)
+            session = Session()
+            sex = Gender(gender_name=gender)
+            session.add(sex)
+            session.commit()
+            session.close()
+            return True
+        except:
+            return False
+
+    def __add_city(self, city):
+        try:
+            Session = sessionmaker(bind=self.engine)
+            session = Session()
+            c = City(city_name=city)
+            session.add(c)
+            session.commit()
+            session.close()
+            return True
+        except:
+            return False
+
 
 def main():
     work = DB(**connect_info)
@@ -143,12 +196,15 @@ def main():
             return False
     person = {'firstname': 'Лена',
               'lastname': 'Андреева',
+              'id_user': '457539545',
               'age': '37',
               'city': 'Дудинка',
+              'gender': 'женский',
               'photos': [('457539545_456239020', (15, 0)), ('457539545_456239024', (12, 0)),
                          ('457539545_456239045', (7, 0))]
               }
     work.writeFoundUser(person)
+
 
 if __name__ == '__main__':
     main()
