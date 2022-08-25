@@ -2,13 +2,13 @@ import vk_api
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
-from vkinder_vk_api import VkontakteApi
+from VK.vkontakte import VkontakteApi
 import configparser
 from time import sleep
 
 class BotApi(VkontakteApi):
 
-    def __init__(self, user_token: str, bot_token: str) -> None:
+    def __init__(self, user_token: str, bot_token: str) -> None:   # переписать инициализацию с super
         """
         Sets attributes user_token, vk_session and vk for object BotApi
         :param user_token: str, users token with necessary rights ('wall' rights are obligatory)
