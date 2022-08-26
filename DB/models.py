@@ -83,8 +83,6 @@ class Photo(Base):
 
     id = sq.Column(sq.Integer, primary_key=True, unique=True, autoincrement=True)
     id_photo = sq.Column(sq.Text, nullable=False)
-    link = sq.Column(sq.Text, nullable=False)
-    amount = sq.Column(sq.Integer, nullable=True)
     id_found_user = sq.Column(sq.Integer, sq.ForeignKey('found_user.id'), nullable=True)
 
 

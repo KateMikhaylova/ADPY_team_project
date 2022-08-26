@@ -97,6 +97,7 @@ class DB:
         if not, then we create such data, assign the id, and then.
         Taking into account the received data, we record the user.
         :param person:  dictionary with data per person
+        'id_user': person id in VK
         'firstname': person's name
         'lastname': person's surname
         'age': age of the person
@@ -124,6 +125,10 @@ class DB:
                           id_city=id_city,
                           age=person['age'])
         session.add(query)
+        record_photo = []
+        for photo in person['photos']:
+            record_photo.append(Photo(id_photo=photo, id_found_user=person['id_user']))
+        session.add_all(record_photo)
         session.commit()
         session.close()
         return True
@@ -156,6 +161,9 @@ class DB:
         session.close()
         for q in query:
             return q.id
+
+    def __query_person(self, person):
+        pass
 
     def __add_gender(self, gender):
         try:
@@ -200,8 +208,8 @@ def main():
               'age': '37',
               'city': 'Дудинка',
               'gender': 'женский',
-              'photos': [('457539545_456239020', (15, 0)), ('457539545_456239024', (12, 0)),
-                         ('457539545_456239045', (7, 0))]
+              'photos': ['457539545_456239020', '457539545_456239024',
+                         '457539545_456239045']
               }
     work.writeFoundUser(person)
 
