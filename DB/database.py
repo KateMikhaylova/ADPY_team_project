@@ -9,7 +9,7 @@ from DB.models import *
 
 connect_info = {'drivername': 'postgresql+psycopg2',
                 'username': 'postgres',
-                'password': '24081986',
+                'password': 'password',
                 'host': 'localhost',
                 'port': 5432,
                 'database': 'vkinder'
@@ -194,6 +194,17 @@ class DB:
         except:
             return False
 
+    # получение фото
+    def query_photo(self, found_user_id):
+        Session = sessionmaker(bind=self.engine)
+        session = Session()
+        query = session.query(Photo.id_photo).filter(Photo.id_found_user == found_user_id).all()
+        session.close()
+        photos = []
+        for q in query:
+            photos.append(q[0])
+        return photos
+
     # Запись в избранное
     def add_to_favourite(self, user_id, found_user_id):
         """
@@ -273,6 +284,7 @@ def main():
     work.writeFoundUser(person)
     work.writeFoundUser(person2)
     work.writeFoundUser(person3)
+    print(work.query_photo(1236789))
 
 
 if __name__ == '__main__':
