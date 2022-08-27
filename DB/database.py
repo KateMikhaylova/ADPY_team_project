@@ -115,22 +115,22 @@ class DB:
         if not g:
             self.__add_gender(person['gender'])
         id_gender = self.__query_gender(person['gender'])
-
-        Session = sessionmaker(bind=self.engine)
-        session = Session()
-        query = FoundUser(id=person['id_user'],
-                          first_name=person['firstname'],
-                          last_name=person['lastname'],
-                          id_gender=id_gender,
-                          id_city=id_city,
-                          age=person['age'])
-        session.add(query)
-        record_photo = []
-        for photo in person['photos']:
-            record_photo.append(Photo(id_photo=photo, id_found_user=person['id_user']))
-        session.add_all(record_photo)
-        session.commit()
-        session.close()
+        if not self.__query_person(person):
+            Session = sessionmaker(bind=self.engine)
+            session = Session()
+            query = FoundUser(id=person['id_user'],
+                              first_name=person['firstname'],
+                              last_name=person['lastname'],
+                              id_gender=id_gender,
+                              id_city=id_city,
+                              age=person['age'])
+            session.add(query)
+            record_photo = []
+            for photo in person['photos']:
+                record_photo.append(Photo(id_photo=photo, id_found_user=person['id_user']))
+            session.add_all(record_photo)
+            session.commit()
+            session.close()
         return True
 
     def readFoundUser(self, requirement: dict) -> tuple:
@@ -163,7 +163,12 @@ class DB:
             return q.id
 
     def __query_person(self, person):
-        pass
+        Session = sessionmaker(bind=self.engine)
+        session = Session()
+        query = session.query(FoundUser).filter(FoundUser.id == person['id_user']).all()
+        session.close()
+        if query:
+            return True
 
     def __add_gender(self, gender):
         try:
@@ -183,6 +188,33 @@ class DB:
             session = Session()
             c = City(city_name=city)
             session.add(c)
+            session.commit()
+            session.close()
+            return True
+        except:
+            return False
+
+    def add_to_favourite(self, user_id, found_user_id):
+        try:
+            Session = sessionmaker(bind=self.engine)
+            session = Session()
+            id_record = f'{user_id}_{found_user_id}'
+            fav = Favorites(id=id_record, id_user=user_id, id_found_user=found_user_id)
+            session.add(fav)
+            session.commit()
+            session.close()
+            return True
+        except:
+            return False
+
+    # запись в чс
+    def add_to_blacklist(self, user_id, found_user_id):
+        try:
+            Session = sessionmaker(bind=self.engine)
+            session = Session()
+            id_record = f'{user_id}_{found_user_id}'
+            bl = BlackList(id=id_record, id_user=user_id, id_found_user=found_user_id)
+            session.add(bl)
             session.commit()
             session.close()
             return True
@@ -211,7 +243,28 @@ def main():
               'photos': ['457539545_456239020', '457539545_456239024',
                          '457539545_456239045']
               }
+    person2 = {'firstname': 'Светлана',
+               'lastname': 'Иванова',
+               'id_user': '123456789',
+               'age': '20',
+               'city': 'Париж',
+               'gender': 'женский',
+               'photos': ['123456789_456239020', '123456789_456239024',
+                          '123456789_456239045']
+               }
+    person3 = {'firstname': 'Лена',
+               'lastname': 'Андреева',
+               'id_user': '457539545',
+               'age': '37',
+               'city': 'Дудинка',
+               'gender': 'женский',
+               'photos': ['457539545_456239020', '457539545_456239024',
+                          '457539545_456239045']
+               }
+
     work.writeFoundUser(person)
+    work.writeFoundUser(person2)
+    work.writeFoundUser(person3)
 
 
 if __name__ == '__main__':
