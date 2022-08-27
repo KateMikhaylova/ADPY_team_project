@@ -194,7 +194,15 @@ class DB:
         except:
             return False
 
+    # Запись в избранное
     def add_to_favourite(self, user_id, found_user_id):
+        """
+        id_record - в виде iduser_idfounduser
+        for example 44556677_1234567
+        :param user_id:
+        :param found_user_id:
+        :return:
+        """
         try:
             Session = sessionmaker(bind=self.engine)
             session = Session()
