@@ -16,7 +16,6 @@ connect_info = {'drivername': 'postgresql+psycopg2',
                 'database': 'vkinder'
                 }
 
-
 class DB:
     """
     Create a new :class: DB
@@ -32,7 +31,7 @@ class DB:
     ---------------------------------------
     """
 
-    def __init__(self, **info):
+    def __init__(self, **info: dict):
         self.info = info
         dsn = sqlalchemy.engine.url.URL.create(**info)
         self.engine = sqlalchemy.create_engine(dsn)
@@ -99,31 +98,31 @@ class DB:
         Taking into account the received data, we record the user.
         :param person:  dictionary with data per person
         'id_user': person id in VK
-        'firstname': person's name
-        'lastname': person's surname
+        'first_name': person's name
+        'last_name': person's surname
         'age': age of the person
-        'city': person 's city
+        'city': person 's id_city
+        'city_title: user city title
         'photos': list of id photos of a person
-        'gender': gender of the person
+        'gender': id_gender of the person
+        'gender_title': user_gender_title
         :return: true/false was the recording successful
         """
 
         q = self.__query_city(person['city'])
         if not q:
-            self.__add_city(person['city'])
-        id_city = self.__query_city(person['city'])
+            self.__add_city(id=person['city'], city_title=person['city_title'])
         g = self.__query_gender(person['gender'])
         if not g:
-            self.__add_gender(person['gender'])
-        id_gender = self.__query_gender(person['gender'])
+            self.__add_gender(id=person['gender'], gender_title=person['gender_title'])
         if not self.__query_person(person):
             Session = sessionmaker(bind=self.engine)
             session = Session()
             query = FoundUser(id=person['id_user'],
-                              first_name=person['firstname'],
-                              last_name=person['lastname'],
-                              id_gender=id_gender,
-                              id_city=id_city,
+                              first_name=person['first_name'],
+                              last_name=person['last_name'],
+                              id_gender=person['gender'],
+                              id_city=person['city'],
                               age=person['age'])
             session.add(query)
             record_photo = []
@@ -134,35 +133,37 @@ class DB:
             session.close()
         return True
 
-    def __query_gender(self, gender):
+    def __query_gender(self, gender: int) -> int:
         Session = sessionmaker(bind=self.engine)
         session = Session()
-        query = session.query(Gender).filter(Gender.gender_name == gender).all()
+        query = session.query(Gender).filter(Gender.id == gender).all()
         session.close()
         for q in query:
             return q.id
 
-    def __query_city(self, city):
+    def __query_city(self, city: id) -> int:
         Session = sessionmaker(bind=self.engine)
         session = Session()
-        query = session.query(City).filter(City.city_name == city).all()
+        query = session.query(City).filter(City.id == city).all()
         session.close()
         for q in query:
             return q.id
 
-    def __query_person(self, person):
+    def __query_person(self, person: dict) -> bool:
         Session = sessionmaker(bind=self.engine)
         session = Session()
         query = session.query(FoundUser).filter(FoundUser.id == person['id_user']).all()
         session.close()
         if query:
             return True
+        else:
+            return False
 
-    def __add_gender(self, gender):
+    def __add_gender(self, **gender_info) -> bool:
         try:
             Session = sessionmaker(bind=self.engine)
             session = Session()
-            sex = Gender(gender_name=gender)
+            sex = Gender(**gender_info)
             session.add(sex)
             session.commit()
             session.close()
@@ -170,11 +171,11 @@ class DB:
         except:
             return False
 
-    def __add_city(self, city):
+    def __add_city(self, **city_info) -> bool:
         try:
             Session = sessionmaker(bind=self.engine)
             session = Session()
-            c = City(city_name=city)
+            c = City(**city_info)
             session.add(c)
             session.commit()
             session.close()
@@ -183,10 +184,10 @@ class DB:
             return False
 
     # получение фото
-    def query_photo(self, found_user_id):
+    def query_photo(self, id_found_user: int) -> list:
         Session = sessionmaker(bind=self.engine)
         session = Session()
-        query = session.query(Photo.id_photo).filter(Photo.id_found_user == found_user_id).all()
+        query = session.query(Photo.id_photo).filter(Photo.id_found_user == id_found_user).all()
         session.close()
         photos = []
         for q in query:
@@ -194,40 +195,44 @@ class DB:
         return photos
 
     def readFoundUser(self, bot_user_id: int, requirement: dict) -> tuple:
+        """
+        Search for a user in the database
+        :param bot_user_id: int - id of the user who is looking for a mate
+        :param requirement: dict
+        'gender':int - id gender
+        'city':int - id city
+        'age':int - person age
+        :return:
+        """
         Session = sessionmaker(bind=self.engine)
         session = Session()
         subquery = session.query(BlackList.id_found_user).filter(BlackList.id_user == bot_user_id).all()
-        query = session.query(FoundUser).filter(
-            FoundUser.id_gender == session.query(Gender.id).filter(
-                requirement['gender'] == Gender.gender_name).scalar_subquery(),
-            FoundUser.id_city == session.query(City.id).filter(requirement['city'] == City.city_name).scalar_subquery(),
-            FoundUser.age == requirement['age'],
-            FoundUser.id.not_in(subquery))
+        query = session.query(FoundUser).filter(FoundUser.id_gender == requirement['gender'],
+                                                FoundUser.id_city == requirement['city'],
+                                                FoundUser.age == requirement['age'], FoundUser.id.not_in(subquery))
         # ~FoundUser.id.in_(subquery)) второй вариант, если первый не сработает
         session.close()
         result = []
         for q in query:
             result.append({'first_name': q.first_name,
                            'last_name': q.last_name,
-                           'age': q.age,
-                           'city': q.city,
                            'id_user': q.id})
         return result
 
     # Запись в избранное
-    def add_to_favourite(self, user_id, found_user_id):
+    def add_to_favourite(self, id_user: int, id_found_user: int) -> bool:
         """
         id_record - в виде iduser_idfounduser
         for example 44556677_1234567
-        :param user_id:
-        :param found_user_id:
-        :return:
+        :param id_user: int
+        :param id_found_user: int
+        :return: bool
         """
         try:
             Session = sessionmaker(bind=self.engine)
             session = Session()
-            id_record = f'{user_id}_{found_user_id}'
-            fav = Favorites(id=id_record, id_user=user_id, id_found_user=found_user_id)
+            id_record = f'{id_user}_{id_found_user}'
+            fav = Favorites(id=id_record, id_user=id_user, id_found_user=id_found_user)
             session.add(fav)
             session.commit()
             session.close()
@@ -235,13 +240,20 @@ class DB:
         except:
             return False
 
-    # запись в чс
-    def add_to_blacklist(self, user_id, found_user_id):
+    def add_to_blacklist(self, id_user, id_found_user) -> bool:
+        """
+        add a person to the blacklist
+        id_record - in the form of: 'id_user'_'id_found_user'
+        for example 44556677_1234567
+        :param id_user: int
+        :param id_found_user: int
+        :return: bool
+        """
         try:
             Session = sessionmaker(bind=self.engine)
             session = Session()
-            id_record = f'{user_id}_{found_user_id}'
-            bl = BlackList(id=id_record, id_user=user_id, id_found_user=found_user_id)
+            id_record = f'{id_user}_{id_found_user}'
+            bl = BlackList(id=id_record, id_user=id_user, id_found_user=id_found_user)
             session.add(bl)
             session.commit()
             session.close()
@@ -262,45 +274,58 @@ def main():
             print(test_new_db)
             print('НИЧЕГО НЕ РАБОТАЕТ!')
             return False
-    person = {'firstname': 'Лена',
-              'lastname': 'Андреева',
+
+    person = {'first_name': 'Лена',
+              'last_name': 'Андреева',
+              'midle_name': None,
               'id_user': 457539545,
-              'age': '37',
-              'city': 'Дудинка',
-              'gender': 'женский',
+              'age': 37,
+              'city': 312,
+              'city_title': 'Дудинка',
+              'gender': 1,
+              'gender_title': 'женский',
               'photos': ['457539545_456239020', '457539545_456239024',
                          '457539545_456239045']
               }
-    person2 = {'firstname': 'Светлана',
-               'lastname': 'Иванова',
+    person2 = {'first_name': 'Светлана',
+               'last_name': 'Иванова',
                'id_user': 123456789,
-               'age': '37',
-               'city': 'Дудинка',
-               'gender': 'женский',
+               'age': 37,
+               'city_title': 'Дудинка',
+               'city': 312,
+               'gender': 1,
+               'gender_title': 'женский',
+               'midle_name': None,
                'photos': ['123456789_456239020', '123456789_456239024',
                           '123456789_456239045']
                }
-    person3 = {'firstname': 'Айгуль',
-               'lastname': 'Магомедова',
+    person3 = {'first_name': 'Айгуль',
+               'last_name': 'Магомедова',
                'id_user': 90000232,
+               'midle_name': 'Рашид-кызы',
                'age': 37,
-               'city': 'Колыма',
-               'gender': 'женский',
+               'city': 200,
+               'city_title': 'Якутск',
+               'gender_title': 'женский',
+               'gender': 1,
                'photos': ['457232539545_456239020', '457539322545_456239024',
                           '457539532245_456239045']
                }
     test = {
-        'gender': 'женский',
-        'city': 'Дудинка',
+        'gender': 1,
+        'city': 312,
         'age': 37
     }
     work.writeFoundUser(person)
     work.writeFoundUser(person2)
     work.writeFoundUser(person3)
     res = work.readFoundUser(bot_user_id=123412, requirement=test)
-    for person in res:
-        photo = work.query_photo(person['id_user'])
-        print(person['id_user'], person['first_name'], person['last_name'], photo)
+    if res:
+        for person in res:
+            photo = work.query_photo(person['id_user'])
+            print(person['id_user'], person['first_name'], person['last_name'], photo)
+    else:
+        print('Пусто мана')
 
 
 if __name__ == '__main__':

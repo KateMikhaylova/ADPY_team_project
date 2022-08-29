@@ -10,7 +10,7 @@ class User(Base):
     id = sq.Column(sq.Integer, primary_key=True, unique=True)
     last_name = sq.Column(sq.Text, nullable=False)
     first_name = sq.Column(sq.Text, nullable=False)
-    patronymic = sq.Column(sq.Text, nullable=True)
+    midle_name = sq.Column(sq.Text, nullable=True)
     age = sq.Column(sq.Integer, nullable=True)
     id_gender = sq.Column(sq.Integer, sq.ForeignKey('gender.id'), nullable=False)
     id_city = sq.Column(sq.Integer, sq.ForeignKey('city.id'), nullable=True)
@@ -27,7 +27,7 @@ class FoundUser(Base):
     id = sq.Column(sq.Integer, primary_key=True, unique=True)
     last_name = sq.Column(sq.Text, nullable=False)
     first_name = sq.Column(sq.Text, nullable=False)
-    patronymic = sq.Column(sq.Text, nullable=True)
+    midle_name = sq.Column(sq.Text, nullable=True)
     age = sq.Column(sq.Integer, nullable=False)
     id_gender = sq.Column(sq.Integer, sq.ForeignKey('gender.id'), nullable=False)
     id_city = sq.Column(sq.Integer, sq.ForeignKey('city.id'), nullable=False)
@@ -43,7 +43,7 @@ class City(Base):
     __tablename__ = 'city'
 
     id = sq.Column(sq.Integer, primary_key=True, unique=True)
-    city_name = sq.Column(sq.Text, nullable=False)
+    city_title = sq.Column(sq.Text, nullable=False)
 
     def __str__(self):
         return f'{self.city_name}'
@@ -53,7 +53,7 @@ class Gender(Base):
     __tablename__ = 'gender'
 
     id = sq.Column(sq.Integer, primary_key=True, unique=True)
-    gender_name = sq.Column(sq.Text, nullable=False)
+    gender_title = sq.Column(sq.Text, nullable=False)
 
 
 class Hobby(Base):
