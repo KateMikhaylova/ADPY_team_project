@@ -16,22 +16,26 @@ connect_info = {'drivername': 'postgresql+psycopg2',
                 'database': 'vkinder'
                 }
 
+
 class DB:
     """
     Create a new :class: DB
 
-    The standard calling form consists in sending :ref: a dictionary with data on connection to the database.
-    --------------------------------------
-    drivername - indicates the type of database and driver to work with.
-    username - the name of the database user.
-    password - the password of the administrator from the database.
-    host - where the database is located. For localhost location
-    port - the connection port.
-    database - the name of the database.
-    ---------------------------------------
     """
 
     def __init__(self, **info: dict):
+        """
+            The standard calling form consists in sending :ref: a dictionary with data on connection to the database.
+            :param info: dict
+            --------------------------------------
+            drivername - indicates the type of database and driver to work with.
+            username - the name of the database user.
+            password - the password of the administrator from the database.
+            host - where the database is located. For localhost location
+            port - the connection port.
+            database - the name of the database.
+            ---------------------------------------
+        """
         self.info = info
         dsn = sqlalchemy.engine.url.URL.create(**info)
         self.engine = sqlalchemy.create_engine(dsn)
@@ -39,7 +43,6 @@ class DB:
     def newdatabase(self) -> (bool, psycopg2.Error):
         """
         creating a new database.
-
         using psycopg2, a connection to the database is made
         and a new database is created using a query.
         """
