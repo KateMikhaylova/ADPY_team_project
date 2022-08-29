@@ -81,11 +81,11 @@ class VkontakteApi:
         return user
 
     @staticmethod
-    def determinate_search_parameters(user_information: dict) -> tuple:
+    def determinate_search_parameters(user_information: dict) -> list:
         """
         Staticmethod, returns parameters for search (same age and city and opposite gender)
         :param user_information: dict with user information
-        :return: tuple with search parameters: city id, gender id, age
+        :return: list with search parameters: city id, gender id, age
         """
 
         search_city_id = user_information['city']
@@ -97,7 +97,7 @@ class VkontakteApi:
 
         search_age = user_information['age']
 
-        return search_city_id, search_gender_id, search_age
+        return [search_city_id, search_gender_id, search_age]
 
     def search_people(self, city_id: Optional[int], sex: int, age: Optional[int]) -> list:
         """
@@ -108,7 +108,7 @@ class VkontakteApi:
         :return: list of dicts with users information
         """
 
-        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=10,
+        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=20,
                                         fields='bdate,city,sex,can_send_friend_request,can_write_private_message,relation')
 
         return [person for person in response['items'] if not person['is_closed']
