@@ -4,6 +4,7 @@ import configparser
 import datetime
 
 from pprint import pprint
+from typing import Optional
 from time import sleep
 
 
@@ -15,7 +16,7 @@ class VkontakteApi:
         user_token: str
                     users token used to get access to VkApi methods
         vk_session: class vk_api.vk_api.VkApi object
-                    used to create vk attrubute and to create VkRequestsPool object
+                    used to create vk attribute and to create VkRequestsPool object
         vk:         class vk_api.vk_api.VkApiMethod object
                     used to call VkApi methods
 
@@ -39,54 +40,66 @@ class VkontakteApi:
         self.vk_session = vk_api.VkApi(token=self.user_token)
         self.vk = self.vk_session.get_api()
 
-    def get_user_info(self, user_id: int) -> tuple:
+    def get_user_info(self, user_id: int) -> dict:
         """
         Gets info on VK user based in his id
         :param user_id: integer, unique users id
-        :return: tuple with city id, city name, gender id, gender name and age
+        :return: dict with user information
         """
         response = self.vk.users.get(user_ids=user_id, fields='bdate, city, sex')
 
-        user_city_id = response[0]['city']['id']
-        user_city_title = response[0]['city']['title']
+        if 'city' in response[0]:
+            user_city_id = response[0]['city']['id']
+            user_city_title = response[0]['city']['title']
+        else:
+            user_city_id = None
+            user_city_title = None
 
         user_gender_id = response[0]['sex']
         if user_gender_id == 1:
-            user_gender = 'ж'
-        elif user_gender_id == 2:
-            user_gender = 'м'
+            user_gender_title = 'женский'
         else:
-            user_gender = None
+            user_gender_title = 'мужской'
 
-        birth_day = response[0]['bdate'].split('.') # Если др скрыт, все ломается
+        if 'bdate' in response[0] and len(response[0]['bdate'].split('.')) > 2:
+            birth_day = response[0]['bdate'].split('.')
+            user_birthday_date = datetime.date(int(birth_day[2]), int(birth_day[1]), int(birth_day[0]))
+            user_age = int((datetime.date.today() - user_birthday_date).days//365.25)
+        else:
+            user_age = None
 
-        user_birthday_date = datetime.date(int(birth_day[2]), int(birth_day[1]), int(birth_day[0]))
-        user_age = int((datetime.date.today() - user_birthday_date).days//365.25)
+        user = {'lastname': response[0]['last_name'],
+                'firstname': response[0]['first_name'],
+                'id_user': response[0]['id'],
+                'city': user_city_id,
+                'city_title': user_city_title,
+                'gender': user_gender_id,
+                'gender_title': user_gender_title,
+                'age': user_age,
+                }
 
-        return user_city_id, user_city_title, user_gender_id, user_gender, user_age
+        return user
 
     @staticmethod
-    def determinate_search_parameters(user_parameters_tuple: tuple) -> tuple:
+    def determinate_search_parameters(user_information: dict) -> tuple:
         """
         Staticmethod, returns parameters for search (same age and city and opposite gender)
-        :param user_parameters_tuple: tuple with user information
+        :param user_information: dict with user information
         :return: tuple with search parameters: city id, gender id, age
         """
 
-        search_city_id = user_parameters_tuple[0]
+        search_city_id = user_information['city']
 
-        if user_parameters_tuple[2] == 1:
+        if user_information['gender'] == 1:
             search_gender_id = 2
-        elif user_parameters_tuple[2] == 2:
-            search_gender_id = 1
         else:
-            search_gender_id = 0
+            search_gender_id = 1
 
-        search_age = user_parameters_tuple[4]
+        search_age = user_information['age']
 
         return search_city_id, search_gender_id, search_age
 
-    def search_people(self, city_id: int, sex: int, age: int) -> list:
+    def search_people(self, city_id: Optional[int], sex: int, age: Optional[int]) -> list:
         """
         Gets list of VK users with open profiles based on indicated gender, city and age
         :param city_id: integer, city id used in VK database
@@ -96,11 +109,13 @@ class VkontakteApi:
         """
 
         response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=10,
-                                        fields='bdate, city, sex,can_send_friend_request, can_write_private_message, relation')
+                                        fields='bdate,city,sex,can_send_friend_request,can_write_private_message,relation')
 
-        return [person for person in response['items'] if not person['is_closed']]
+        return [person for person in response['items'] if not person['is_closed']
+                                                       and 'city' in person
+                                                       and 'bdate' in person and len(person['bdate'].split('.')) > 2]
 
-    def search_many_people(self, city_id: int, sex: int, age: int) -> list:
+    def search_many_people(self, city_id: Optional[int], sex: int, age: Optional[int]) -> list:
         """
         Gets list of VK users with open profiles based on indicated gender, city and age. Uses Vk Request Pool to get
         more search results
@@ -118,25 +133,27 @@ class VkontakteApi:
                                                    'birth_month': birth_month,
                                                    'count': 1000, 'sex': sex, 'city': city_id,
                                                    'age_to': age,
-                                                   'fields': 'bdate, city, sex,can_send_friend_request, can_write_private_message, relation'})
+                                                   'fields': 'bdate,city,sex,can_send_friend_request,can_write_private_message,relation'})
 
         people_list = []
         for value in people.values():
             people_list.extend(value.result['items'])
 
-        return [person for person in people_list if not person['is_closed']]
+        return [person for person in people_list if not person['is_closed']
+                                                 and 'city' in person
+                                                 and 'bdate' in person and len(person['bdate'].split('.')) > 2]
 
     def get_3_photos(self, user_id: int) -> list:
         """
         Gets users profile and marked photos and takes three most liked of them
         :param user_id: users id to search photos
-        :return: list of tuples with photo id and quantity of likes and whether token user has already liked photo or not
+        :return: list of tuples with photo ids
         """
         response = self.vk.photos.get(owner_id=user_id, album_id='profile', extended=1)
 
         photo_dict = {}
         for photo in response['items']:
-            photo_dict[f"{photo['owner_id']}_{photo['id']}"] = (photo['likes']['count'], photo['likes']['user_likes'])
+            photo_dict[f"{photo['owner_id']}_{photo['id']}"] = photo['likes']['count']
 
         # Get photos where user is marked
 
@@ -158,11 +175,11 @@ class VkontakteApi:
             pass
         else:
             for photo in response['response']['items']:
-                photo_dict[f"{photo['owner_id']}_{photo['id']}"] = (photo['likes']['count'], photo['likes']['user_likes'])
+                photo_dict[f"{photo['owner_id']}_{photo['id']}"] = photo['likes']['count']
 
-        three_photos = sorted(photo_dict.items(), key=lambda x: x[1][0], reverse=True)[0:3]
+        three_photos = sorted(photo_dict.items(), key=lambda x: x[1], reverse=True)[0:3]
 
-        return three_photos
+        return [photo[0] for photo in three_photos]
 
     def like_photo(self, owner_id: int, photo_id: int) -> bool:
         """
@@ -213,7 +230,8 @@ if __name__ == '__main__':
 
     vkontakte = VkontakteApi(user_token)
     #
-    # user_info = vkontakte.get_user_info(1)
+    user_info = vkontakte.get_user_info(1)
+    pprint(user_info)
     # print('\nИнфа на Павла Дурова: город, пол, возраст', user_info)
     #
     # search_info = vkontakte.determinate_search_parameters(user_info)
@@ -238,4 +256,4 @@ if __name__ == '__main__':
     # # Желающие могут лайкнуть аву Дурова и удалить лайк
     # # print(vkontakte.like_photo(1, 456264771))
     # # print(vkontakte.delete_like_photo(1, 456264771))
-    print(vkontakte.check_like_presence('1_376599151'))
+    # print(vkontakte.check_like_presence('1_376599151'))
