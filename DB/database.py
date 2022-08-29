@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+
 import psycopg2
 import sqlalchemy
 from psycopg2 import Error
@@ -9,7 +10,7 @@ from DB.models import *
 
 connect_info = {'drivername': 'postgresql+psycopg2',
                 'username': 'postgres',
-                'password': 'password',
+                'password': '24081986',
                 'host': 'localhost',
                 'port': 5432,
                 'database': 'vkinder'
@@ -133,19 +134,6 @@ class DB:
             session.close()
         return True
 
-    def readFoundUser(self, requirement: dict) -> tuple:
-        """
-        In the method, we get a dictionary with
-        query parameters to search in the database.
-        :param: requirement: dict
-        :return: tuple
-        """
-        Session = sessionmaker(bind=self.engine)
-        session = Session()
-
-        session.close()
-        return ()
-
     def __query_gender(self, gender):
         Session = sessionmaker(bind=self.engine)
         session = Session()
@@ -205,6 +193,27 @@ class DB:
             photos.append(q[0])
         return photos
 
+    def readFoundUser(self, bot_user_id: int, requirement: dict) -> tuple:
+        Session = sessionmaker(bind=self.engine)
+        session = Session()
+        subquery = session.query(BlackList.id_found_user).filter(BlackList.id_user == bot_user_id).all()
+        query = session.query(FoundUser).filter(
+            FoundUser.id_gender == session.query(Gender.id).filter(
+                requirement['gender'] == Gender.gender_name).scalar_subquery(),
+            FoundUser.id_city == session.query(City.id).filter(requirement['city'] == City.city_name).scalar_subquery(),
+            FoundUser.age == requirement['age'],
+            FoundUser.id.not_in(subquery))
+        # ~FoundUser.id.in_(subquery)) второй вариант, если первый не сработает
+        session.close()
+        result = []
+        for q in query:
+            result.append({'first_name': q.first_name,
+                           'last_name': q.last_name,
+                           'age': q.age,
+                           'city': q.city,
+                           'id_user': q.id})
+        return result
+
     # Запись в избранное
     def add_to_favourite(self, user_id, found_user_id):
         """
@@ -255,7 +264,7 @@ def main():
             return False
     person = {'firstname': 'Лена',
               'lastname': 'Андреева',
-              'id_user': '457539545',
+              'id_user': 457539545,
               'age': '37',
               'city': 'Дудинка',
               'gender': 'женский',
@@ -264,27 +273,34 @@ def main():
               }
     person2 = {'firstname': 'Светлана',
                'lastname': 'Иванова',
-               'id_user': '123456789',
-               'age': '20',
-               'city': 'Париж',
+               'id_user': 123456789,
+               'age': '37',
+               'city': 'Дудинка',
                'gender': 'женский',
                'photos': ['123456789_456239020', '123456789_456239024',
                           '123456789_456239045']
                }
-    person3 = {'firstname': 'Лена',
-               'lastname': 'Андреева',
-               'id_user': '457539545',
-               'age': '37',
-               'city': 'Дудинка',
+    person3 = {'firstname': 'Айгуль',
+               'lastname': 'Магомедова',
+               'id_user': 90000232,
+               'age': 37,
+               'city': 'Колыма',
                'gender': 'женский',
-               'photos': ['457539545_456239020', '457539545_456239024',
-                          '457539545_456239045']
+               'photos': ['457232539545_456239020', '457539322545_456239024',
+                          '457539532245_456239045']
                }
-
+    test = {
+        'gender': 'женский',
+        'city': 'Дудинка',
+        'age': 37
+    }
     work.writeFoundUser(person)
     work.writeFoundUser(person2)
     work.writeFoundUser(person3)
-    print(work.query_photo(1236789))
+    res = work.readFoundUser(bot_user_id=123412, requirement=test)
+    for person in res:
+        photo = work.query_photo(person['id_user'])
+        print(person['id_user'], person['first_name'], person['last_name'], photo)
 
 
 if __name__ == '__main__':

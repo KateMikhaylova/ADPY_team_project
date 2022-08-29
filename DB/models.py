@@ -45,6 +45,9 @@ class City(Base):
     id = sq.Column(sq.Integer, primary_key=True, unique=True)
     city_name = sq.Column(sq.Text, nullable=False)
 
+    def __str__(self):
+        return f'{self.city_name}'
+
 
 class Gender(Base):
     __tablename__ = 'gender'
