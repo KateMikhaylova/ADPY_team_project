@@ -92,6 +92,36 @@ class DB:
         except:
             return False
 
+    def writeUser(self, person: dict) -> bool:
+        """
+
+        :param person:
+        id: str
+        first_name: str
+        last_name: str
+        midle_name: str
+        age: int
+        city: int
+        city_title: str
+        gender: int
+        gender_title: str
+        :return: bool
+        """
+        q = self.__query_city(person['city'])
+        if not q:
+            self.__add_city(id=person['city'], city_title=person['city_title'])
+        g = self.__query_gender(person['gender'])
+        if not g:
+            self.__add_gender(id=person['gender'], gender_title=person['gender_title'])
+        if not self.__query_user(person):
+            Session = sessionmaker(bind=self.engine)
+            session = Session()
+            query = User(**person)
+            session.add(query)
+            session.commit()
+            session.close()
+        return True
+
     def writeFoundUser(self, person: dict) -> bool:
         """
         Writing to the database of the found user
@@ -156,6 +186,16 @@ class DB:
         Session = sessionmaker(bind=self.engine)
         session = Session()
         query = session.query(FoundUser).filter(FoundUser.id == person['id_user']).all()
+        session.close()
+        if query:
+            return True
+        else:
+            return False
+
+    def __query_user(self, person):
+        Session = sessionmaker(bind=self.engine)
+        session = Session()
+        query = session.query(User).filter(User.id == person['id']).all()
         session.close()
         if query:
             return True
