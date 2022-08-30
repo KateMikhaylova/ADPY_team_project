@@ -237,6 +237,18 @@ class DB:
             photos.append(q[0])
         return photos
 
+    def readUser(self, id_user: int):
+        Session = sessionmaker(bind=self.engine)
+        session = Session()
+        query = session.query(User).filter(User.id == id_user).all()
+        result = []
+        if query:
+            for q in query:
+                result.append({'first_name': q.first_name,
+                               'last_name': q.last_name,
+                               'id_user': q.id})
+        return result
+
     def readFoundUser(self, bot_user_id: int, requirement: dict) -> tuple:
         """
         Search for a user in the database
