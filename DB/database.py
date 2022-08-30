@@ -116,7 +116,13 @@ class DB:
         if not self.__query_user(person):
             Session = sessionmaker(bind=self.engine)
             session = Session()
-            query = User(**person)
+            query = User(id=person['id'],
+                         first_name=person['first_name'],
+                         last_name=person['last_name'],
+                         midle_name=person['midle_name'],
+                         id_gender=person['gender'],
+                         id_city=person['city'],
+                         age=person['age'])
             session.add(query)
             session.commit()
             session.close()
@@ -154,6 +160,7 @@ class DB:
             query = FoundUser(id=person['id_user'],
                               first_name=person['first_name'],
                               last_name=person['last_name'],
+                              midle_name=person['midle_name'],
                               id_gender=person['gender'],
                               id_city=person['city'],
                               age=person['age'])
@@ -381,6 +388,17 @@ def main():
             print(person['id_user'], person['first_name'], person['last_name'], photo)
     else:
         print('Пусто мана')
+    user = {'first_name': 'Сергей',
+            'last_name': 'Быстроруков',
+            'id': 45672,
+            'midle_name': 'Васильевич',
+            'age': 37,
+            'city': 312,
+            'city_title': 'Дудинка',
+            'gender_title': 'мужской',
+            'gender': 2,
+            }
+    work.writeUser(user)
 
 
 if __name__ == '__main__':
