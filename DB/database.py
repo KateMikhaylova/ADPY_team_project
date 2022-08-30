@@ -6,7 +6,7 @@ from psycopg2 import Error
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from sqlalchemy.orm import sessionmaker
 
-from DB.models import *
+from DB.models import User, FoundUser, City, Gender, Hobby, BlackList, Favorites, Photo, create_tables
 
 connect_info = {'drivername': 'postgresql+psycopg2',
                 'username': 'postgres',
@@ -119,7 +119,7 @@ class DB:
             query = User(id=person['id'],
                          first_name=person['first_name'],
                          last_name=person['last_name'],
-                         midle_name=person['midle_name'],
+                         middle_name=person['middle_name'],
                          id_gender=person['gender'],
                          id_city=person['city'],
                          age=person['age'])
@@ -160,7 +160,7 @@ class DB:
             query = FoundUser(id=person['id_user'],
                               first_name=person['first_name'],
                               last_name=person['last_name'],
-                              midle_name=person['midle_name'],
+                              middle_name=person['middle_name'],
                               id_gender=person['gender'],
                               id_city=person['city'],
                               age=person['age'])
@@ -269,10 +269,15 @@ class DB:
         Session = sessionmaker(bind=self.engine)
         session = Session()
         subquery = session.query(BlackList.id_found_user).filter(BlackList.id_user == bot_user_id).all()
+        subquery_list = []
+        for result in subquery:
+            subquery_list.append(result[0])
+
         query = session.query(FoundUser).filter(FoundUser.id_gender == requirement['gender'],
                                                 FoundUser.id_city == requirement['city'],
-                                                FoundUser.age == requirement['age'], FoundUser.id.not_in(subquery))
-        # ~FoundUser.id.in_(subquery)) второй вариант, если первый не сработает
+                                                FoundUser.age == requirement['age'],
+                                                FoundUser.id.not_in(subquery_list))
+
         session.close()
         result = []
         for q in query:
@@ -301,6 +306,25 @@ class DB:
             return True
         except:
             return False
+
+    def query_favourite(self, user_id):
+        Session = sessionmaker(bind=self.engine)
+        session = Session()
+        subquery = session.query(Favorites.id_found_user).filter(Favorites.id_user == user_id).all()
+        subquery_list = [i[0] for i in subquery]
+        query = session.query(FoundUser).filter(FoundUser.id.in_(subquery_list)).all()
+        session.close()
+        return query
+
+    def delete_from_favourites(self, id_user, id_found_user):
+        Session = sessionmaker(bind=self.engine)
+        session = Session()
+        favourite = session.query(Favorites).filter(Favorites.id_user == id_user,
+                                                    Favorites.id_found_user == id_found_user).all()
+        if favourite:
+            session.delete(favourite[0])
+            session.commit()
+            session.close()
 
     def add_to_blacklist(self, id_user, id_found_user) -> bool:
         """

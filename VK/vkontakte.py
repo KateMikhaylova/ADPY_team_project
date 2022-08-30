@@ -68,14 +68,15 @@ class VkontakteApi:
         else:
             user_age = None
 
-        user = {'lastname': response[0]['last_name'],
-                'firstname': response[0]['first_name'],
-                'id_user': response[0]['id'],
+        user = {'last_name': response[0]['last_name'],
+                'first_name': response[0]['first_name'],
+                'id': response[0]['id'],
                 'city': user_city_id,
                 'city_title': user_city_title,
                 'gender': user_gender_id,
                 'gender_title': user_gender_title,
                 'age': user_age,
+                'middle_name': None
                 }
 
         return user
@@ -108,7 +109,7 @@ class VkontakteApi:
         :return: list of dicts with users information
         """
 
-        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=20,
+        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=10,
                                         fields='bdate,city,sex,can_send_friend_request,can_write_private_message,relation')
 
         return [person for person in response['items'] if not person['is_closed']

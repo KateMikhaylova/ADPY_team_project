@@ -3,21 +3,23 @@ from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
 from VK.vkontakte import VkontakteApi
+from DB.database import DB
 import configparser
 from time import sleep
 import datetime
 from pprint import pprint
 
 
-class BotApi(VkontakteApi):
+class BotApi(VkontakteApi, DB):
 
-    def __init__(self, user_token: str, bot_token: str) -> None:
+    def __init__(self, user_token: str, bot_token: str, **info: dict) -> None:
         """
         Sets attributes user_token, vk_session, vk, bot_token, bot_session, bot, longpool for object BotApi
         :param user_token: str, users token with necessary rights ('wall' rights are obligatory)
         :param bot_token: str, bot token of the community
         """
-        super().__init__(user_token)
+        VkontakteApi.__init__(self, user_token)
+        DB.__init__(self, **info)
         self.bot_token = bot_token
         self.bot_session = vk_api.VkApi(token=self.bot_token)
         self.bot = self.bot_session.get_api()
@@ -42,7 +44,7 @@ class BotApi(VkontakteApi):
 
         if uid not in select_dict and uid not in current_photos:
             user_info = self.get_user_info(uid)
-            # тут можно записать юзера в БД
+            self.writeUser(user_info)
 
             search_info = self.determinate_search_parameters(user_info)
             search_parameters[uid] = search_info
@@ -66,7 +68,7 @@ class BotApi(VkontakteApi):
         global search_parameters
         if uid in search_parameters and search_parameters[uid][2] is None:
             try:
-                age = int(message_command.split()[1])
+                age = int(message_command.split()[-1])
                 search_parameters[uid][2] = age
             except ValueError:
                 self.send_any_msg(uid, 'Неизвестная команда')
@@ -112,6 +114,10 @@ class BotApi(VkontakteApi):
                 self.send_start_keyboard(uid)
                 return
             search_info = search_parameters[uid][:]
+            search_info_dict = {'gender': search_info[1],
+                                'city': search_info[0],
+                                'age': search_info[2]
+                                }
 
             if search_info[0] and search_info[2]:
                 self.send_empty_keyboard(uid, 'Начинаю поиск')
@@ -138,8 +144,8 @@ class BotApi(VkontakteApi):
                     user_birthday_date = datetime.date(int(birth_day[2]), int(birth_day[1]), int(birth_day[0]))
                     user_age = int((datetime.date.today() - user_birthday_date).days // 365.25)
 
-                    person_info = {'lastname': person['last_name'],
-                                   'firstname': person['first_name'],
+                    person_info = {'last_name': person['last_name'],
+                                   'first_name': person['first_name'],
                                    'id_user': person['id'],
                                    'city': person['city']['id'],
                                    'city_title': person['city']['title'],
@@ -147,26 +153,20 @@ class BotApi(VkontakteApi):
                                    'gender_title': user_gender_title,
                                    'age': user_age,
                                    'photos': photos,
+                                   'middle_name': None
                                    }
                     pprint(person)
-                    # здесь записываем людей и их фотографии в БД
-                    # теперь вызываем селект всех людей подходящих по search_info из бд.
-                    # Там наверное какой-нибудь список кортежей вернется.
-                    # причем нам нужен левый джойн по id жениха/невесты с черным списком и фильтрацией по NULL. Вроде так
-                select_result = [(195253, 'Александр', 'Александров'),
-                                 (333888, 'Борис', 'Борисов'),
-                                 (22256, 'Владимир', 'Владимиров'),
-                                 (195253, 'Григорий', 'Григорьев'),
-                                 (333888, 'Дмитрий', 'Дмитриев'),
-                                 (22256, 'Егор', 'Егоров')]  # для имитации работы
+                    self.writeFoundUser(person_info)
+
+                select_result = self.readFoundUser(uid, search_info_dict)
 
                 select_dict[uid] = [0, select_result]
                 first_person = select_dict[uid][1][select_dict[uid][0]]
-                # тут наверное отдельно придется селектнуть фотки человека, потому что если в верхнем селекте сделать джойн,
-                # люди затроятся
-                first_person_photos = ['1_456264771', '1_376599151', '1_288668576']  # для имитации работы
+                first_person_photos = self.query_photo(first_person['id_user'])
+
                 current_photos[uid] = first_person_photos
-                self.send_person_msg(uid, first_person[0], first_person[1], first_person[2],
+                self.send_person_msg(uid, first_person['id_user'],
+                                     first_person['first_name'], first_person['last_name'],
                                      first_person_photos[0], first_person_photos[1], first_person_photos[2])
 
                 self.send_next_keyboard(uid)
@@ -190,10 +190,9 @@ class BotApi(VkontakteApi):
             select_dict[uid][0] += 1
             if select_dict[uid][0] < len(select_dict[uid][1]):
                 next_person = select_dict[uid][1][select_dict[uid][0]]
-                # селектим фотки человека
-                next_person_photos = ['1_278184324', '1_263219735', '1_263219656']
+                next_person_photos = self.query_photo(next_person['id_user'])
                 current_photos[uid] = next_person_photos
-                self.send_person_msg(uid, next_person[0], next_person[1], next_person[2],
+                self.send_person_msg(uid, next_person['id_user'], next_person['first_name'], next_person['last_name'],
                                      next_person_photos[0], next_person_photos[1], next_person_photos[2])
                 self.send_next_keyboard(uid)
             else:
@@ -203,7 +202,7 @@ class BotApi(VkontakteApi):
                 keyboard.add_button('посмотреть избранных', color=VkKeyboardColor.SECONDARY)
                 self.bot.messages.send(peer_id=uid,
                                        random_id=get_random_id(),
-                                       keyboard=keyboard.get_keyboard(),  # получаем Json клавиатуры
+                                       keyboard=keyboard.get_keyboard(),
                                        message=f'''Вы посмотрели всех подобранных пользователей.
 Благодарим за использование бота''')
         else:
@@ -240,24 +239,27 @@ class BotApi(VkontakteApi):
         global select_dict
         if uid in select_dict:
             current_person = select_dict[uid][1][select_dict[uid][0]]
-            # запись в таблицу избранное uid - айдишник юзера, current_person[0] айдишник жениха/невесты
+            self.add_to_favourite(uid, current_person['id_user'])
         else:
             text = 'Вы еще не начинали или уже закончили поиск. Нажмите start, чтобы начать новый поиск'
             self.send_any_msg(uid, text)
             self.send_start_keyboard(uid)
 
     def execute_show_favourite(self, uid):
-        # джойн юзеров с женихами/невестами, отбор юзера по uid, вывод всех отобранных женихов/невест
-        # вывод в бота сделать в формате имя фамилия ссылка
-        pass
+        favourites = self.query_favourite(uid)
+        text = ''
+        for favourite in favourites:
+            text += f'{favourite.first_name} {favourite.last_name}\nhttps://vk.com/id{favourite.id}\n'
+        if not text:
+            text = 'Вы еще никого не добавили в избранное (ну или отправили в черный список всех, кого ранее добавляли в избранное)'
+        self.send_any_msg(uid, text)
 
     def execute_add_to_blacklist(self, uid):
         global select_dict
         if uid in select_dict:
             current_person = select_dict[uid][1][select_dict[uid][0]]
-            # запись в таблицу черный список uid - айдишник юзера, current_person айдишник жениха/невесты.
-            # Подумать над ситуацией, когда в чс кидают избранного (или запретить это делать, или удалять в таком
-            # случае из избранного)
+            self.add_to_blacklist(uid, current_person['id_user'])
+            self.delete_from_favourites(uid, current_person['id_user'])
         else:
             text = 'Вы еще не начинали или уже закончили поиск. Нажмите start, чтобы начать новый поиск'
             self.send_any_msg(uid, text)
@@ -415,7 +417,26 @@ if __name__ == '__main__':
     user_token = config['VK']['token']
     bot_token = config['VK']['bot_token']
 
-    vkontakte_bot = BotApi(user_token, bot_token)
+    connect_info = {'drivername': 'postgresql+psycopg2',
+                    'username': 'postgres',
+                    'password': '24081986',
+                    'host': 'localhost',
+                    'port': 5432,
+                    'database': 'vkinder'
+                    }
+
+    vkontakte_bot = BotApi(user_token, bot_token, **connect_info)
+
+    engine = vkontakte_bot.preparation()
+    test_create = vkontakte_bot.createtable(engine)
+    if not test_create:
+        test_new_db = vkontakte_bot.newdatabase()
+        if test_new_db:
+            vkontakte_bot.createtable(engine)
+        else:
+            print(test_new_db)
+            print('НИЧЕГО НЕ РАБОТАЕТ!')
+
 
     search_parameters = dict()
     select_dict = dict()
@@ -423,7 +444,6 @@ if __name__ == '__main__':
 
     for event in vkontakte_bot.longpool.listen():
         if event.type == VkEventType.MESSAGE_NEW:
-            # pprint(event.__dict__) посмотреть внутренности
             if event.to_me:
                 user_message = event.text.lower()
                 user_id = event.user_id
