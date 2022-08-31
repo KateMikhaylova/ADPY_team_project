@@ -17,6 +17,7 @@ connect_info = {'drivername': 'postgresql+psycopg2',
                 }
 
 
+# noinspection PyUnresolvedReferences
 class DB:
     """
     Create a new :class: DB
@@ -36,11 +37,12 @@ class DB:
             database - the name of the database.
             ---------------------------------------
         """
+        self.connection = None
         self.info = info
         dsn = sqlalchemy.engine.url.URL.create(**info)
         self.engine = sqlalchemy.create_engine(dsn)
 
-    def newdatabase(self) -> (bool, psycopg2.Error):
+    def new_database(self) -> (bool, psycopg2.Error):
         """
         creating a new database.
         using psycopg2, a connection to the database is made
@@ -61,7 +63,7 @@ class DB:
     def __create_db(self):
         try:
             self.cursor = self.connection.cursor()
-            self.cursor.execute('create database ' + self.info['database'])
+            self.cursor.execute('create database ' + f"{self.info['database']}")
             if self.__close():
                 return True
         except (Exception, Error):
@@ -75,7 +77,8 @@ class DB:
     def preparation(self) -> sqlalchemy.engine.base.Engine:
         return self.engine
 
-    def createtable(self, engine: sqlalchemy.engine.base.Engine) -> bool:
+    @staticmethod
+    def create_table(engine: sqlalchemy.engine.base.Engine) -> bool:
         """
         From the file models.py we get a function for
         creating tables, with which we create the tables
@@ -92,7 +95,7 @@ class DB:
         except:
             return False
 
-    def writeUser(self, person: dict) -> bool:
+    def write_user(self, person: dict) -> bool:
         """
 
         :param person:
@@ -128,7 +131,7 @@ class DB:
             session.close()
         return True
 
-    def writeFoundUser(self, person: dict) -> bool:
+    def write_found_user(self, person: dict) -> bool:
         """
         Writing to the database of the found user
         At the beginning, we get information about the city id and gender id,
@@ -244,7 +247,7 @@ class DB:
             photos.append(q[0])
         return photos
 
-    def readUser(self, id_user: int):
+    def read_user(self, id_user: int):
         Session = sessionmaker(bind=self.engine)
         session = Session()
         query = session.query(User).filter(User.id == id_user).all()
@@ -256,7 +259,7 @@ class DB:
                                'id_user': q.id})
         return result
 
-    def readFoundUser(self, bot_user_id: int, requirement: dict) -> tuple:
+    def read_found_user(self, bot_user_id: int, requirement: dict) -> list:
         """
         Search for a user in the database
         :param bot_user_id: int - id of the user who is looking for a mate
@@ -276,7 +279,7 @@ class DB:
         query = session.query(FoundUser).filter(FoundUser.id_gender == requirement['gender'],
                                                 FoundUser.id_city == requirement['city'],
                                                 FoundUser.age == requirement['age'],
-                                                FoundUser.id.not_in(subquery_list))
+                                                FoundUser.id.not_in(subquery_list)).all()
 
         session.close()
         result = []
@@ -286,7 +289,6 @@ class DB:
                            'id_user': q.id})
         return result
 
-    # Запись в избранное
     def add_to_favourite(self, id_user: int, id_found_user: int) -> bool:
         """
         id_record - в виде iduser_idfounduser
@@ -351,79 +353,15 @@ class DB:
 def main():
     work = DB(**connect_info)
     engine = work.preparation()
-    test_create = work.createtable(engine)
+    test_create = work.create_table(engine)
     if not test_create:
-        test_new_db = work.newdatabase()
+        test_new_db = work.new_database()
         if test_new_db:
-            work.createtable(engine)
+            work.create_table(engine)
         else:
             print(test_new_db)
             print('НИЧЕГО НЕ РАБОТАЕТ!')
             return False
-
-    person = {'first_name': 'Лена',
-              'last_name': 'Андреева',
-              'midle_name': None,
-              'id_user': 457539545,
-              'age': 37,
-              'city': 312,
-              'city_title': 'Дудинка',
-              'gender': 1,
-              'gender_title': 'женский',
-              'photos': ['457539545_456239020', '457539545_456239024',
-                         '457539545_456239045']
-              }
-    person2 = {'first_name': 'Светлана',
-               'last_name': 'Иванова',
-               'id_user': 123456789,
-               'age': 37,
-               'city_title': 'Дудинка',
-               'city': 312,
-               'gender': 1,
-               'gender_title': 'женский',
-               'midle_name': None,
-               'photos': ['123456789_456239020', '123456789_456239024',
-                          '123456789_456239045']
-               }
-    person3 = {'first_name': 'Айгуль',
-               'last_name': 'Магомедова',
-               'id_user': 90000232,
-               'midle_name': 'Рашид-кызы',
-               'age': 37,
-               'city': 200,
-               'city_title': 'Якутск',
-               'gender_title': 'женский',
-               'gender': 1,
-               'photos': ['457232539545_456239020', '457539322545_456239024',
-                          '457539532245_456239045']
-               }
-    test = {
-        'gender': 1,
-        'city': 312,
-        'age': 37
-    }
-    work.writeFoundUser(person)
-    work.writeFoundUser(person2)
-    work.writeFoundUser(person3)
-    res = work.readFoundUser(bot_user_id=123412, requirement=test)
-    if res:
-        for person in res:
-            photo = work.query_photo(person['id_user'])
-            print(person['id_user'], person['first_name'], person['last_name'], photo)
-    else:
-        print('Пусто мана')
-    user = {'first_name': 'Сергей',
-            'last_name': 'Быстроруков',
-            'id': 45672,
-            'midle_name': 'Васильевич',
-            'age': 37,
-            'city': 312,
-            'city_title': 'Дудинка',
-            'gender_title': 'мужской',
-            'gender': 2,
-            }
-    work.writeUser(user)
-
 
 if __name__ == '__main__':
     main()
