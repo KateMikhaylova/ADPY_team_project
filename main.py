@@ -7,3 +7,4 @@ if __name__ == '__main__':
     token = config['VK']['token']
 
     vk = Vkontakte(token)
+    print(vk.get_customer_info())
