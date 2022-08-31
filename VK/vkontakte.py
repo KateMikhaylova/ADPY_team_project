@@ -1,11 +1,6 @@
 import vk_api
 import requests
-import configparser
 import datetime
-
-from pprint import pprint
-from typing import Optional
-from time import sleep
 
 
 class VkontakteApi:
@@ -22,7 +17,7 @@ class VkontakteApi:
 
     Methods:
         get_user_info: gets info on VK user based in his id
-        determinate_search_parameters: staticmethod, returns parameters for search (same age and city and opposite gender)
+        determinate_search_parameters: staticmethod, returns parameters for search (same age, city and opposite gender)
         search_people: gets list of VK users with open profiles based on indicated gender, city and age
         search_many_people: same as previous, but uses Vk Request Pool to get more search results
         get_3_photos: gets users profile and marked photos and takes three most liked of them
@@ -100,7 +95,7 @@ class VkontakteApi:
 
         return [search_city_id, search_gender_id, search_age]
 
-    def search_people(self, city_id: Optional[int], sex: int, age: Optional[int]) -> list:
+    def search_people(self, city_id: int, sex: int, age: int) -> list:
         """
         Gets list of VK users with open profiles based on indicated gender, city and age
         :param city_id: integer, city id used in VK database
@@ -109,14 +104,14 @@ class VkontakteApi:
         :return: list of dicts with users information
         """
 
-        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=50,
-                                        fields='bdate,city,sex,can_send_friend_request,can_write_private_message,relation')
+        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=30,
+                                        fields='bdate,city,sex')
 
         return [person for person in response['items'] if not person['is_closed']
                                                        and 'city' in person
                                                        and 'bdate' in person and len(person['bdate'].split('.')) > 2]
 
-    def search_many_people(self, city_id: Optional[int], sex: int, age: Optional[int]) -> list:
+    def search_many_people(self, city_id: int, sex: int, age: int) -> list:
         """
         Gets list of VK users with open profiles based on indicated gender, city and age. Uses Vk Request Pool to get
         more search results
@@ -128,13 +123,14 @@ class VkontakteApi:
         people = {}
 
         with vk_api.VkRequestsPool(self.vk_session) as pool:
-            for birth_month in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]: # Можно добавить второй цикл по дням, но такое количество результатов очень долго получать и обрабатывать
+            for birth_month in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]:
+                # second for (days from 1 to 31) may be added for more results (search and proceed will be very long)
                 people[birth_month] = pool.method('users.search',
                                                   {'age_from': age,
                                                    'birth_month': birth_month,
                                                    'count': 1000, 'sex': sex, 'city': city_id,
                                                    'age_to': age,
-                                                   'fields': 'bdate,city,sex,can_send_friend_request,can_write_private_message,relation'})
+                                                   'fields': 'bdate,city,sex'})
 
         people_list = []
         for value in people.values():
@@ -148,7 +144,7 @@ class VkontakteApi:
         """
         Gets users profile and marked photos and takes three most liked of them
         :param user_id: users id to search photos
-        :return: list of tuples with photo ids
+        :return: list with photo ids
         """
         response = self.vk.photos.get(owner_id=user_id, album_id='profile', extended=1)
 
@@ -185,7 +181,8 @@ class VkontakteApi:
     def like_photo(self, owner_id: int, photo_id: int) -> bool:
         """
         Likes requested photo by token user
-        :param owner_id: id of user who published photo (in case if marked photo it may not be the same as searched user id)
+        :param owner_id: id of user who published photo
+        (in case if marked photo it may not be the same as searched user id)
         :param photo_id: id of photo
         :return: bool, True if method returned information on likes quantity, otherwise False
         """
@@ -201,7 +198,8 @@ class VkontakteApi:
     def delete_like_photo(self, owner_id: int, photo_id: int) -> bool:
         """
         Deletes likes from requested photo by token user
-        :param owner_id: id of user who published photo (in case if marked photo it may not be the same as searched user id)
+        :param owner_id: id of user who published photo
+        (in case if marked photo it may not be the same as searched user id)
         :param photo_id: id of photo
         :return: bool, True if method returned information on likes quantity, otherwise False
         """
@@ -214,7 +212,7 @@ class VkontakteApi:
 
     def check_like_presence(self, photo: str) -> bool:
         """
-        Сhecks whether photo liked by token user or not
+        Check whether photo liked by token user or not
         :param photo: photo id
         :return: True if like present, otherwise false
         """
@@ -226,40 +224,3 @@ class VkontakteApi:
                 return False
         except vk_api.exceptions.ApiError:
             return False
-
-
-if __name__ == '__main__':
-
-    config = configparser.ConfigParser()
-    config.read('settings.ini')
-    user_token = config['VK']['token']
-
-    vkontakte = VkontakteApi(user_token)
-    #
-    user_info = vkontakte.get_user_info(1)
-    pprint(user_info)
-    # print('\nИнфа на Павла Дурова: город, пол, возраст', user_info)
-    #
-    # search_info = vkontakte.determinate_search_parameters(user_info)
-    # print('\nПараметры для невесты Павла Дурова: город, пол, возраст', search_info)
-    #
-    # people = vkontakte.search_people(*search_info)
-    # print('\nНашли невест для Павла Дурова', len(people))
-    # pprint(people)
-    # print()
-    #
-    # # #Тут будет очень много невест, несколько тысяч
-    # # people = vkontakte.search_many_people(*search_info)
-    # # print(len(people))
-    # # # печатать их прям вообще не рекомендую
-    # # # pprint(people)
-    #
-    # print('\nЛучшие фотографии невест:')
-    # for person in people:
-    #     print(vkontakte.get_3_photos(person['id']))
-    #     sleep(0.33)
-    #
-    # # Желающие могут лайкнуть аву Дурова и удалить лайк
-    # # print(vkontakte.like_photo(1, 456264771))
-    # # print(vkontakte.delete_like_photo(1, 456264771))
-    # print(vkontakte.check_like_presence('1_376599151'))

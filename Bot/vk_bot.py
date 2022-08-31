@@ -2,22 +2,71 @@ import vk_api
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
+
 from VK.vkontakte import VkontakteApi
 from DB.database import DB
-import configparser
-from time import sleep
+
 import datetime
-from pprint import pprint
+from time import sleep
 
 
 class BotApi(VkontakteApi, DB):
+    """
+    Class for Vkontakte bot (inherited from VkontakteAPI to call its methods and from DB class to work with database)
+
+    Attributes:
+        user_token: str
+                    users token used to get access to VkApi methods
+        vk_session: class vk_api.vk_api.VkApi object
+                    used to create vk attribute and to create VkRequestsPool object
+        vk:         class vk_api.vk_api.VkApiMethod object
+                    used to call VkApi methods
+        bot_token:  str
+                    bot token used to send messages in group chat on behalf of the group
+        bot_session:class vk_api.vk_api.VkApi object
+                    used to create bot, longpool attributes and to send messages to bot user
+        bot:        class vk_api.vk_api.VkApiMethod object
+                    used to send keyboards to bot user
+        longpool:   class vk_api.longpoll.VkLongPoll object
+                    used to perform bot permanent run
+        info:       dict to create DSN for database connection
+        engine:     engine to work with database
+        connection: connection with database via psycopg2 in order to create new database if nesessary
+        cursor:     psycopg2 connection cursor
+
+    Methods:
+        execute_beginning: executes Begin command
+        execute_help: executes Help command
+        execute_start: executes Start command
+        execute_age: executes different Age commands
+        execute_city: executes different City commands
+        execute_search: executes Search command
+        execute_next: executes Next command
+        execute_like_photo: executes different photo like commands
+        execute_delete_like_photo: executes different photo delete like commands command
+        execute_add_to_favourite: executes Add to favourite command
+        execute_show_favourite: executes Show favourite command
+        execute_add_to_blacklist: executes Add to blacklist command
+        send_any_msg: sends message to user with any text
+        send_person_msg: sends message to user wth mate name, surname link and photos
+        send_empty_keyboard: sends empty keyboard to user (deletes previous active keyboard)
+        send_search_keyboard: sends search keyboard to user
+        send_start_keyboard: sends start keyboard to user
+        send_age_city_keyboard: sends age and city choise keyboard to user
+        send_age_keyboard: sends age choise keyboard to user
+        send_city_keyboard: sends city choise keyboard to user
+        send_next_keyboard: sends next keyboard to user
+        run_bot: creates/updates database and permanently runs bot to chat with users
+    """
 
     def __init__(self, user_token: str, bot_token: str, **info: dict) -> None:
         """
-        Sets attributes user_token, vk_session, vk, bot_token, bot_session, bot, longpool for object BotApi
+        Sets attributes user_token, vk_session, vk, bot_token, bot_session, bot, longpool, info, engine for object
+        BotApi
         :param user_token: str, users token with necessary rights ('wall' rights are obligatory)
         :param bot_token: str, bot token of the community
         """
+
         VkontakteApi.__init__(self, user_token)
         DB.__init__(self, **info)
         self.bot_token = bot_token
@@ -25,27 +74,54 @@ class BotApi(VkontakteApi, DB):
         self.bot = self.bot_session.get_api()
         self.longpool = VkLongPoll(self.bot_session)
 
-    def execute_beginning(self, uid: int):
+    def execute_beginning(self, uid: int) -> bool:
+        """
+        Executes 'Начать' command, sends user start keyboard
+        :param uid: user id
+        :return:
+        """
+
         self.send_start_keyboard(uid)
 
-    def execute_help(self, uid: int):
+        return True
+
+    def execute_help(self, uid: int) -> bool:
+        """
+        Checks whether user has started work with bot or not
+        If yes, sends him next keyboard, if not, sends him start keyboard
+        :param uid: user id
+        :return:
+        """
+
         global select_dict
         global current_photos
 
         if uid not in select_dict and uid not in current_photos:
             self.send_start_keyboard(uid)
+
         else:
             text = '''Вы уже произвели поиск. 
 Вы можете произвести действия с последним полученным пользователем или перейти к следующему'''
             self.send_any_msg(uid, text)
             self.send_next_keyboard(uid)
 
-    def execute_start(self, uid: int):
+        return True
+
+    def execute_start(self, uid: int) -> bool:
+        """
+        Checks whether user has started work with bot or not
+        If yes, sends him next keyboard, if not, writes him in database, determinates search parameters and either
+        sends search keyboard to user or sends him age/city/age-city keyboards if these parameters are absent on user
+        page and need to be filled
+        :param uid: user id
+        :return:
+        """
         global select_dict
         global current_photos
         global search_parameters
 
         if uid not in select_dict and uid not in current_photos:
+
             user_info = self.get_user_info(uid)
             self.writeUser(user_info)
 
@@ -54,10 +130,13 @@ class BotApi(VkontakteApi, DB):
 
             if search_info[0] and search_info[2]:
                 self.send_search_keyboard(uid)
+
             elif not search_info[0] and not search_info[2]:
                 self.send_age_city_keyboard(uid)
+
             elif not search_info[2]:
                 self.send_age_keyboard(uid)
+
             elif not search_info[0]:
                 self.send_city_keyboard(uid)
 
@@ -66,6 +145,8 @@ class BotApi(VkontakteApi, DB):
 Вы можете произвести действия с последним полученным пользователем или перейти к следующему'''
             self.send_any_msg(uid, text)
             self.send_next_keyboard(uid)
+
+        return True
 
     def execute_age(self, uid, message_command):
         global search_parameters
@@ -158,7 +239,7 @@ class BotApi(VkontakteApi, DB):
                                    'photos': photos,
                                    'middle_name': None
                                    }
-                    pprint(person)
+
                     self.writeFoundUser(person_info)
 
                 select_result = self.readFoundUser(uid, search_info_dict)
@@ -257,7 +338,8 @@ class BotApi(VkontakteApi, DB):
         for favourite in favourites:
             text += f'{favourite.first_name} {favourite.last_name}\nhttps://vk.com/id{favourite.id}\n'
         if not text:
-            text = 'Вы еще никого не добавили в избранное (ну или отправили в черный список всех, кого ранее добавляли в избранное)'
+            text = '''Вы еще никого не добавили в избранное 
+(ну или отправили в черный список всех, кого ранее добавляли в избранное)'''
         self.send_any_msg(uid, text)
 
     def execute_add_to_blacklist(self, uid):
@@ -298,7 +380,12 @@ https://vk.com/id{person_id}
 противоположного пола, проживающих в вашем городе.
 Нажмите кнопку search, чтобы начать поиск''')
 
-    def send_start_keyboard(self, uid):
+    def send_start_keyboard(self, uid: int) -> bool:
+        """
+        Sends keyboard with 'start' button to user with indicated id
+        :param uid: user id
+        :return:
+        """
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('start', color=VkKeyboardColor.SECONDARY)
         self.bot.messages.send(peer_id=uid,
@@ -306,6 +393,7 @@ https://vk.com/id{person_id}
                                keyboard=keyboard.get_keyboard(),
                                message=f'''Вас приветствует бот для знакомств VKinder.
 Для начала работы просто нажмите start.''')
+        return True
 
     def send_age_city_keyboard(self, uid):
         keyboard = VkKeyboard(one_time=False)
@@ -474,33 +562,3 @@ https://vk.com/id{person_id}
 search_parameters = dict()
 select_dict = dict()
 current_photos = dict()
-
-if __name__ == '__main__':
-    pass
-    # config = configparser.ConfigParser()
-    # config.read('settings.ini')
-    # user_token = config['VK']['token']
-    # bot_token = config['VK']['bot_token']
-    # postgres_username = config['DB']['username']
-    # postgres_password = config['DB']['password']
-    #
-    # connect_info = {'drivername': 'postgresql+psycopg2',
-    #                 'username': postgres_username,
-    #                 'password': postgres_password,
-    #                 'host': 'localhost',
-    #                 'port': 5432,
-    #                 'database': 'vkinder'
-    #                 }
-    #
-    # vkontakte_bot = BotApi(user_token, bot_token, **connect_info)
-    #
-    # search_parameters = dict()
-    # select_dict = dict()
-    # current_photos = dict()
-    #
-    #
-    #
-    #
-    #
-    #
-    # vkontakte_bot.run_bot()
