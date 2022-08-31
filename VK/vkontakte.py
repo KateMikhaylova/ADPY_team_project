@@ -104,7 +104,7 @@ class VkontakteApi:
         :return: list of dicts with users information
         """
 
-        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=30,
+        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=100,
                                         fields='bdate,city,sex')
 
         return [person for person in response['items'] if not person['is_closed']
