@@ -25,6 +25,9 @@ class BotApi(VkontakteApi, DB):
         self.bot = self.bot_session.get_api()
         self.longpool = VkLongPoll(self.bot_session)
 
+    def execute_beginning(self, uid: int):
+        self.send_start_keyboard(uid)
+
     def execute_help(self, uid: int):
         global select_dict
         global current_photos
@@ -200,10 +203,13 @@ class BotApi(VkontakteApi, DB):
                 del(current_photos[uid])
                 keyboard = VkKeyboard(one_time=True)
                 keyboard.add_button('посмотреть избранных', color=VkKeyboardColor.SECONDARY)
+                keyboard.add_line()
+                keyboard.add_button('start', color=VkKeyboardColor.SECONDARY)
                 self.bot.messages.send(peer_id=uid,
                                        random_id=get_random_id(),
                                        keyboard=keyboard.get_keyboard(),
                                        message=f'''Вы посмотрели всех подобранных пользователей.
+Можете посмотреть избранных пользователей или начать заново.
 Благодарим за использование бота''')
         else:
             text = 'Вы еще не начинали или уже закончили поиск. Нажмите start, чтобы начать новый поиск'
@@ -410,74 +416,91 @@ https://vk.com/id{person_id}
 Вы можете лайкнуть любую из фотографий, отменить лайк, добавить пользователя в избранное, 
 в черный список, посмотреть избранное или перейти к следующему пользователю''')
 
+    def run_bot(self):
+
+        engine = self.preparation()
+        test_create = self.createtable(engine)
+        if not test_create:
+            test_new_db = self.newdatabase()
+            if test_new_db:
+                self.createtable(engine)
+            else:
+                print(test_new_db)
+                print('НИЧЕГО НЕ РАБОТАЕТ!')
+
+        for event in self.longpool.listen():
+            if event.type == VkEventType.MESSAGE_NEW:
+                if event.to_me:
+                    user_message = event.text.lower()
+                    user_id = event.user_id
+                    if user_message == 'начать':
+                        self.execute_beginning(user_id)
+                    elif user_message == 'help':
+                        self.execute_help(user_id)
+                    elif user_message == 'start':
+                        self.execute_start(user_id)
+                    elif user_message == 'search':
+                        self.execute_search(user_id)
+                    elif user_message == 'next':
+                        self.execute_next(user_id)
+                    elif user_message == 'лайк фото 1':
+                        self.execute_like_photo(user_id, 1)
+                    elif user_message == 'лайк фото 2':
+                        self.execute_like_photo(user_id, 2)
+                    elif user_message == 'лайк фото 3':
+                        self.execute_like_photo(user_id, 3)
+                    elif user_message == 'не лайк фото 1':
+                        self.execute_delete_like_photo(user_id, 1)
+                    elif user_message == 'не лайк фото 2':
+                        self.execute_delete_like_photo(user_id, 2)
+                    elif user_message == 'не лайк фото 3':
+                        self.execute_delete_like_photo(user_id, 3)
+                    elif user_message == 'в избранное':
+                        self.execute_add_to_favourite(user_id)
+                    elif user_message == 'посмотреть избранных':
+                        self.execute_show_favourite(user_id)
+                    elif user_message == 'в черный список':
+                        self.execute_add_to_blacklist(user_id)
+                    elif user_message.startswith('возраст'):
+                        self.execute_age(user_id, user_message)
+                    elif user_message.startswith('г.'):
+                        self.execute_city(user_id, user_message)
+                    else:
+                        self.bot_session.method('messages.send', {'user_id': user_id,
+                                                                  'message': 'Неизвестная команда',
+                                                                  'random_id': get_random_id()})
+
+
+search_parameters = dict()
+select_dict = dict()
+current_photos = dict()
 
 if __name__ == '__main__':
-    config = configparser.ConfigParser()
-    config.read('settings.ini')
-    user_token = config['VK']['token']
-    bot_token = config['VK']['bot_token']
-
-    connect_info = {'drivername': 'postgresql+psycopg2',
-                    'username': 'postgres',
-                    'password': '24081986',
-                    'host': 'localhost',
-                    'port': 5432,
-                    'database': 'vkinder'
-                    }
-
-    vkontakte_bot = BotApi(user_token, bot_token, **connect_info)
-
-    engine = vkontakte_bot.preparation()
-    test_create = vkontakte_bot.createtable(engine)
-    if not test_create:
-        test_new_db = vkontakte_bot.newdatabase()
-        if test_new_db:
-            vkontakte_bot.createtable(engine)
-        else:
-            print(test_new_db)
-            print('НИЧЕГО НЕ РАБОТАЕТ!')
-
-
-    search_parameters = dict()
-    select_dict = dict()
-    current_photos = dict()
-
-    for event in vkontakte_bot.longpool.listen():
-        if event.type == VkEventType.MESSAGE_NEW:
-            if event.to_me:
-                user_message = event.text.lower()
-                user_id = event.user_id
-                if user_message == 'help':
-                    vkontakte_bot.execute_help(user_id)
-                elif user_message == 'start':
-                    vkontakte_bot.execute_start(user_id)
-                elif user_message == 'search':
-                    vkontakte_bot.execute_search(user_id)
-                elif user_message == 'next':
-                    vkontakte_bot.execute_next(user_id)
-                elif user_message == 'лайк фото 1':
-                    vkontakte_bot.execute_like_photo(user_id, 1)
-                elif user_message == 'лайк фото 2':
-                    vkontakte_bot.execute_like_photo(user_id, 2)
-                elif user_message == 'лайк фото 3':
-                    vkontakte_bot.execute_like_photo(user_id, 3)
-                elif user_message == 'не лайк фото 1':
-                    vkontakte_bot.execute_delete_like_photo(user_id, 1)
-                elif user_message == 'не лайк фото 2':
-                    vkontakte_bot.execute_delete_like_photo(user_id, 2)
-                elif user_message == 'не лайк фото 3':
-                    vkontakte_bot.execute_delete_like_photo(user_id, 3)
-                elif user_message == 'в избранное':
-                    vkontakte_bot.execute_add_to_favourite(user_id)
-                elif user_message == 'посмотреть избранных':
-                    vkontakte_bot.execute_show_favourite(user_id)
-                elif user_message == 'в черный список':
-                    vkontakte_bot.execute_add_to_blacklist(user_id)
-                elif user_message.startswith('возраст'):
-                    vkontakte_bot.execute_age(user_id, user_message)
-                elif user_message.startswith('г.'):
-                    vkontakte_bot.execute_city(user_id, user_message)
-                else:
-                    vkontakte_bot.bot_session.method('messages.send', {'user_id': user_id,
-                                                                       'message': 'Неизвестная команда',
-                                                                       'random_id': get_random_id()})
+    pass
+    # config = configparser.ConfigParser()
+    # config.read('settings.ini')
+    # user_token = config['VK']['token']
+    # bot_token = config['VK']['bot_token']
+    # postgres_username = config['DB']['username']
+    # postgres_password = config['DB']['password']
+    #
+    # connect_info = {'drivername': 'postgresql+psycopg2',
+    #                 'username': postgres_username,
+    #                 'password': postgres_password,
+    #                 'host': 'localhost',
+    #                 'port': 5432,
+    #                 'database': 'vkinder'
+    #                 }
+    #
+    # vkontakte_bot = BotApi(user_token, bot_token, **connect_info)
+    #
+    # search_parameters = dict()
+    # select_dict = dict()
+    # current_photos = dict()
+    #
+    #
+    #
+    #
+    #
+    #
+    # vkontakte_bot.run_bot()

@@ -109,7 +109,7 @@ class VkontakteApi:
         :return: list of dicts with users information
         """
 
-        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=10,
+        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=50,
                                         fields='bdate,city,sex,can_send_friend_request,can_write_private_message,relation')
 
         return [person for person in response['items'] if not person['is_closed']
@@ -189,11 +189,13 @@ class VkontakteApi:
         :param photo_id: id of photo
         :return: bool, True if method returned information on likes quantity, otherwise False
         """
-
-        response = self.vk.likes.add(type='photo', owner_id=owner_id, item_id=photo_id)
-        if 'likes' in response:
-            return True
-        else:
+        try:
+            response = self.vk.likes.add(type='photo', owner_id=owner_id, item_id=photo_id)
+            if 'likes' in response:
+                return True
+            else:
+                return False
+        except vk_api.exceptions.ApiError:
             return False
 
     def delete_like_photo(self, owner_id: int, photo_id: int) -> bool:
@@ -216,10 +218,13 @@ class VkontakteApi:
         :param photo: photo id
         :return: True if like present, otherwise false
         """
-        response = self.vk.photos.getById(photos=photo, extended=1)
-        if response[0]['likes']['user_likes']:
-            return True
-        else:
+        try:
+            response = self.vk.photos.getById(photos=photo, extended=1)
+            if response[0]['likes']['user_likes']:
+                return True
+            else:
+                return False
+        except vk_api.exceptions.ApiError:
             return False
 
 
