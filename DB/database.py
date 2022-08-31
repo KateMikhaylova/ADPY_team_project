@@ -6,11 +6,11 @@ from psycopg2 import Error
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from sqlalchemy.orm import sessionmaker
 
-from DB.models import User, FoundUser, City, Gender, Hobby, BlackList, Favorites, Photo, create_tables
+from DB.models import User, FoundUser, City, Gender, BlackList, Favorites, Photo, create_tables
 
 connect_info = {'drivername': 'postgresql+psycopg2',
                 'username': 'postgres',
-                'password': '24081986',
+                'password': 'password',
                 'host': 'localhost',
                 'port': 5432,
                 'database': 'vkinder'
