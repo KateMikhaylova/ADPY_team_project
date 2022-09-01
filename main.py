@@ -1,5 +1,6 @@
 import configparser
 from VK.vkontakte import Vkontakte
+from pprint import pprint
 
 if __name__ == '__main__':
     config = configparser.ConfigParser()
@@ -7,4 +8,4 @@ if __name__ == '__main__':
     token = config['VK']['token']
 
     vk = Vkontakte(token)
-    print(vk.get_customer_info())
+    pprint(vk.get_customer_info())
