@@ -16,7 +16,7 @@ class Vkontakte:
 
     def get_customer_info(self):
         user_id = self.id
-        response = self.session_api.users.get(user_ids=3343902, fields='city, sex, bdate, relation, interests, '
+        response = self.session_api.users.get(user_ids=user_id, fields='city, sex, bdate, relation, interests, '
                                                                        'personal, music, movies, books')
         customer_portrait = {}
 
