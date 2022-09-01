@@ -2,7 +2,6 @@ import requests
 import vk_api
 import datetime
 from Bot.vk_bot import get_id
-from pprint import pprint
 from string import punctuation as symbols
 
 
@@ -17,8 +16,8 @@ class Vkontakte:
 
     def get_customer_info(self):
         user_id = self.id
-        response = self.session_api.users.get(user_ids=1913781, fields='city, sex, bdate, interests, personal, music,'
-                                                                       'movies, books')
+        response = self.session_api.users.get(user_ids=3343902, fields='city, sex, bdate, relation, interests, '
+                                                                       'personal, music, movies, books')
         customer_portrait = {}
 
         if 'city' in response[0]:
@@ -36,6 +35,11 @@ class Vkontakte:
             customer_portrait['age'] = int((datetime.date.today() - customer_birth_day).days // 365.25)
         else:
             customer_portrait['age'] = None
+
+        if 'relation' in response[0]:
+            customer_portrait['relation'] = response[0]['relation']
+        else:
+            customer_portrait['relation'] = None
 
         if 'interests' in response[0]:
             customer_interests = response[0]['interests'].lower()
@@ -66,6 +70,30 @@ class Vkontakte:
         else:
             customer_portrait['books'] = None
 
+        if 'music' in response[0]:
+            customer_music = response[0]['music'].lower()
+            for item in customer_music:
+                if item in symbols:
+                    customer_music = customer_music.replace(item, ',')
+            customer_music = customer_music.split(',')
+            for item in range(len(customer_music)):
+                customer_music[item] = customer_music[item].strip()
+                customer_portrait['music'] = customer_music
+        else:
+            customer_portrait['music'] = None
+
+        if 'movies' in response[0]:
+            customer_movies = response[0]['movies'].lower()
+            for item in customer_movies:
+                if item in symbols:
+                    customer_movies = customer_movies.replace(item, ',')
+            customer_movies = customer_movies.split(',')
+            for item in range(len(customer_movies)):
+                customer_movies[item] = customer_movies[item].strip()
+                customer_portrait['movies'] = customer_movies
+        else:
+            customer_portrait['movies'] = None
+
         if 'personal' in response[0] and 'alcohol' in response[0]['personal']:
             customer_portrait['alcohol'] = response[0]['personal']['alcohol']
         else:
@@ -82,11 +110,6 @@ class Vkontakte:
             customer_portrait['people_main'] = None
 
         if 'personal' in response[0] and 'smoking' in response[0]['personal']:
-            customer_portrait['smoking'] = response[0]['personal']['smoking']
-        else:
-            customer_portrait['smoking'] = None
-
-        if 'personal' in response[0] and 'music' in response[0]['personal']:
             customer_portrait['smoking'] = response[0]['personal']['smoking']
         else:
             customer_portrait['smoking'] = None
