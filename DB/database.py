@@ -258,8 +258,12 @@ class DB:
         except:
             return False
 
-    # получение фото
     def query_photo(self, id_found_user: int) -> list:
+        """
+        Getting a list of user's photos by id
+        :param id_found_user:
+        :return:
+        """
         Session = sessionmaker(bind=self.engine)
         session = Session()
         query = session.query(Photo.id_photo).filter(Photo.id_found_user == id_found_user).all()
@@ -270,6 +274,11 @@ class DB:
         return photos
 
     def read_user(self, id_user: int):
+        """
+        Getting user data first name, last name, id
+        :param id_user:
+        :return:
+        """
         Session = sessionmaker(bind=self.engine)
         session = Session()
         query = session.query(User).filter(User.id == id_user).all()
@@ -313,6 +322,7 @@ class DB:
 
     def add_to_favourite(self, id_user: int, id_found_user: int) -> bool:
         """
+        add the found user to the favorites list
         id_record - в виде iduser_idfounduser
         for example 44556677_1234567
         :param id_user: int
@@ -331,7 +341,12 @@ class DB:
         except:
             return False
 
-    def query_favourite(self, user_id):
+    def query_favourite(self, user_id: int) -> list:
+        """
+        Getting a list of favorites by user id
+        :param user_id: int
+        :return: list
+        """
         Session = sessionmaker(bind=self.engine)
         session = Session()
         subquery = session.query(Favorites.id_found_user).filter(Favorites.id_user == user_id).all()
@@ -341,6 +356,14 @@ class DB:
         return query
 
     def delete_from_favourites(self, id_user, id_found_user):
+        """
+        remove from Favorites list
+        id_record - in the form of: 'id_user'_'id_found_user'
+        for example 44556677_1234567
+        :param id_user: int
+        :param id_found_user: int
+        :return: bool
+        """
         Session = sessionmaker(bind=self.engine)
         session = Session()
         favourite = session.query(Favorites).filter(Favorites.id_user == id_user,
@@ -384,6 +407,7 @@ def main():
             print(test_new_db)
             print('НИЧЕГО НЕ РАБОТАЕТ!')
             return False
+
 
 if __name__ == '__main__':
     main()
