@@ -291,6 +291,10 @@ class BotApi(VkontakteApi, DB):
 
             select_result = self.read_found_user(uid, search_info_dict)
 
+            if not select_result:
+                self.send_any_msg(uid, 'В базе пока нет для вас пары. Возвращайтесь позже, база все время обновляется')
+                return False
+
             self.select_dict[uid] = [0, select_result]
             first_person = self.select_dict[uid][1][self.select_dict[uid][0]]
 
