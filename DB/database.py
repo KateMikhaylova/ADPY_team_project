@@ -21,7 +21,9 @@ connect_info = {'drivername': 'postgresql+psycopg2',
 class DB:
     """
     Create a new :class: DB
-
+    This class is an interface for working with a database.
+    Creating a database, creating tables in the database,
+    querying the database and creating records.
     """
 
     def __init__(self, **info: dict):
