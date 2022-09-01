@@ -24,6 +24,26 @@ class DB:
     This class is an interface for working with a database.
     Creating a database, creating tables in the database,
     querying the database and creating records.
+    new_database()
+    __create_db()
+    __close()
+    preparation()
+    create_table()
+    write_user()
+    write_found_user()
+    __query_gender()
+    __query_person()
+    __query_city()
+    __query_user()
+    __add_gender()
+    __add_city()
+    query_photo()
+    read_user()
+    read_found_user()
+    add_to_favourite()
+    query_favourite()
+    delete_from_favourites()
+    add_to_blacklist()
     """
 
     def __init__(self, **info: dict):
