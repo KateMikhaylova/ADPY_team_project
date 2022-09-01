@@ -24,6 +24,7 @@ class DB:
     This class is an interface for working with a database.
     Creating a database, creating tables in the database,
     querying the database and creating records.
+    ___________________Methods_______________________________
     new_database()
     __create_db()
     __close()
