@@ -131,7 +131,7 @@ class VkontakteApi:
         :return: list of dicts with users information
         """
 
-        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=20,
+        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=100,
                                         fields='''activities, bdate, books, city, games, interests, movies, 
                                         music, personal, relation, sex, tv''')
 
