@@ -5,9 +5,12 @@ from vk_api.utils import get_random_id
 
 from VK.vkontakte import VkontakteApi
 from DB.database import DB
+from interests.interests import InterestsComparison
 
 import datetime
 from time import sleep
+import nltk
+from nltk.corpus import stopwords
 
 
 class BotApi(VkontakteApi, DB):
@@ -37,6 +40,7 @@ class BotApi(VkontakteApi, DB):
                             to search method
         select_dict:        attribute to save each bot users select results and position on watching through them
         current_photos:     attribute to save each bot users current showing mate, needed to action with photos
+        interests:          attribute for class InterestsComparison object to call this class methods
 
     Methods:
         execute_beginning: executes Begin command
@@ -45,6 +49,7 @@ class BotApi(VkontakteApi, DB):
         execute_age: executes different Age commands
         execute_city: executes different City commands
         execute_search: executes Search command
+        sort_found_user_by_match: sorts list of found users based on their likeness with bot user
         execute_next: executes Next command
         execute_like_photo: executes different photo like commands
         execute_delete_like_photo: executes different photo delete like commands command
@@ -80,6 +85,7 @@ class BotApi(VkontakteApi, DB):
         self.search_parameters = dict()
         self.select_dict = dict()
         self.current_photos = dict()
+        self.interests = InterestsComparison()
 
     def execute_beginning(self, uid: int) -> bool:
         """
@@ -284,7 +290,16 @@ class BotApi(VkontakteApi, DB):
                                'gender_title': user_gender_title,
                                'age': user_age,
                                'photos': photos,
-                               'middle_name': None
+                               'middle_name': None,
+                               'activities': person.get('activities'),
+                               'books': person.get('books'),
+                               'games': person.get('games'),
+                               'interests': person.get('interests'),
+                               'movies': person.get('movies'),
+                               'music': person.get('music'),
+                               'personal': person.get('personal'),
+                               'relation': person.get('relation'),
+                               'tv': person.get('tv')
                                }
 
                 self.write_found_user(person_info)
@@ -294,6 +309,8 @@ class BotApi(VkontakteApi, DB):
             if not select_result:
                 self.send_any_msg(uid, 'В базе пока нет для вас пары. Возвращайтесь позже, база все время обновляется')
                 return False
+
+            select_result = self.sort_found_user_by_match(uid, select_result)
 
             self.select_dict[uid] = [0, select_result]
             first_person = self.select_dict[uid][1][self.select_dict[uid][0]]
@@ -320,6 +337,67 @@ class BotApi(VkontakteApi, DB):
         elif not search_info[0]:
             self.send_city_keyboard(uid)
             return False
+
+    def sort_found_user_by_match(self, uid: int, found_users: list) -> list:
+        """
+        Sorts list of found users based on their likeness with bot user
+        :param uid: bot user id
+        :param found_users: list of found users
+        :return: sorted list of found users
+        """
+        user_dict = self.read_user(uid)[0]
+
+        nltk.download('stopwords')  # line may be commented after first launch to avoid download warning in console
+        all_stopwords = stopwords.words("russian") + stopwords.words("english")
+        all_stopwords.extend(['всюду', 'очень', 'совместно', 'разный', 'самый', 'просто', 'наш', 'большой',
+                              'любой', 'далее', 'круто', 'личный', 'завтра', 'вокруг', 'возможно', 'именно',
+                              'помаленьку', 'многое', 'основное', 'это', 'всякий', 'поскольку', 'ещё', 'частенько',
+                              'бывший', 'рабочий', 'практически', 'вообще', 'ненадолго', 'свой', 'немного',
+                              'также', 'широкий', 'весь', 'хороший', 'каждый', 'внутренний', 'всё', 'пока',
+                              'круглогодично', 'твой'])  # words can be added if necessary
+
+        result = []
+        for found_user in found_users:
+            count = 0
+
+            count += self.interests.compare_age(user_dict['age'], found_user['age'])
+            count += self.interests.compare_city(user_dict['city'], found_user['city'])
+
+            count += self.interests.evaluate_relations(found_user['relation'])
+            count += self.interests.compare_languages(user_dict['langs'], found_user['langs'])
+
+            count += self.interests.compare_interests_words(user_dict['activities'], found_user['activities'],
+                                                            all_stopwords, 2, 4, 6)
+            count += self.interests.compare_interests_words(user_dict['interests'], found_user['interests'],
+                                                            all_stopwords, 2, 4, 6)
+            count += self.interests.compare_interests_words(user_dict['inspired_by'], found_user['inspired_by'],
+                                                            all_stopwords, 1, 2, 3)
+
+            count += self.interests.compare_interests_phrases(user_dict['music'], found_user['music'], 2, 3, 4)
+            count += self.interests.compare_interests_phrases(user_dict['movies'], found_user['movies'], 2, 3, 4)
+            count += self.interests.compare_interests_phrases(user_dict['tv'], found_user['tv'], 1, 2, 3)
+            count += self.interests.compare_interests_phrases(user_dict['books'], found_user['books'], 1, 2, 3)
+            count += self.interests.compare_interests_phrases(user_dict['games'], found_user['games'], 1, 2, 3)
+
+            count += self.interests.compare_main_things(user_dict['political'], found_user['political'])
+            count += self.interests.compare_main_things(user_dict['religion_id'], found_user['religion_id'])
+            count += self.interests.compare_main_things(user_dict['life_main'], found_user['life_main'])
+            count += self.interests.compare_main_things(user_dict['people_main'], found_user['people_main'])
+
+            count += self.interests.compare_smoking_alcohol(user_dict['smoking'], found_user['smoking'])
+            count += self.interests.compare_smoking_alcohol(user_dict['alcohol'], found_user['alcohol'])
+
+            mutual_friends = self.get_mutual_friends(user_dict['id_user'], found_user['id_user'])
+            count += self.interests.evaluate_mutual_friends(mutual_friends)
+
+            mutual_groups = self.get_groups(user_dict['id_user']) & self.get_groups(found_user['id_user'])
+            count += self.interests.evaluate_mutual_groups(mutual_groups)
+
+            result.append([count, found_user])
+
+        result = sorted(result, key=lambda x: x[0], reverse=True)
+
+        return [i[1] for i in result]
 
     def execute_next(self, uid: int) -> bool:
         """

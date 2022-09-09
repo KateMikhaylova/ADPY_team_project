@@ -24,6 +24,8 @@ class VkontakteApi:
         like_photo: likes requested photo by token user
         delete_like_photo: deletes likes from requested photo by token user
         check_like_presence: checks whether photo is liked by token user or not
+        get_mutual_friends: checks how many mutual friends  do users have
+        get_groups: get set of users groups ids
     """
 
     def __init__(self, user_token: str) -> None:
@@ -41,7 +43,8 @@ class VkontakteApi:
         :param user_id: integer, unique users id
         :return: dict with user information
         """
-        response = self.vk.users.get(user_ids=user_id, fields='bdate, city, sex')
+        response = self.vk.users.get(user_ids=user_id, fields='''activities, bdate, books, city, games, 
+                                     interests, movies, music, personal, relation, sex, tv''')
 
         if 'city' in response[0]:
             user_city_id = response[0]['city']['id']
@@ -71,7 +74,16 @@ class VkontakteApi:
                 'gender': user_gender_id,
                 'gender_title': user_gender_title,
                 'age': user_age,
-                'middle_name': None
+                'middle_name': None,
+                'activities': response[0].get('activities'),
+                'books': response[0].get('books'),
+                'games': response[0].get('games'),
+                'interests': response[0].get('interests'),
+                'movies': response[0].get('movies'),
+                'music': response[0].get('music'),
+                'personal': response[0].get('personal'),
+                'relation': response[0].get('relation'),
+                'tv': response[0].get('tv')
                 }
 
         return user
@@ -105,7 +117,8 @@ class VkontakteApi:
         """
 
         response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=100,
-                                        fields='bdate,city,sex')
+                                        fields='''activities, bdate, books, city, games, interests, movies, 
+                                        music, personal, relation, sex, tv''')
 
         return [person for person in response['items'] if not person['is_closed']
                                                        and 'city' in person
@@ -123,14 +136,15 @@ class VkontakteApi:
         people = {}
 
         with vk_api.VkRequestsPool(self.vk_session) as pool:
-            for birth_month in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]:
+            for birth_month in range(1, 13):
                 # second for (days from 1 to 31) may be added for more results (search and proceed will be very long)
                 people[birth_month] = pool.method('users.search',
                                                   {'age_from': age,
                                                    'birth_month': birth_month,
                                                    'count': 1000, 'sex': sex, 'city': city_id,
                                                    'age_to': age,
-                                                   'fields': 'bdate,city,sex'})
+                                                   'fields': '''activities, bdate, books, city, games, interests,
+                                                   movies, music, personal, relation, sex, tv'''})
 
         people_list = []
         for value in people.values():
@@ -224,3 +238,22 @@ class VkontakteApi:
                 return False
         except vk_api.exceptions.ApiError:
             return False
+
+    def get_mutual_friends(self, uid: int, other_uid: int) -> int:
+        """
+        Returns how many mutual friends two users have
+        :param uid: first user id
+        :param other_uid: second user id
+        :return: quantity of mutual friends
+        """
+        friends = self.vk.friends.getMutual(source_uid=uid, target_uid=other_uid)
+        return len(friends)
+
+    def get_groups(self, uid: int) -> set:
+        """
+        Returns set of users groups ids
+        :param uid: user id
+        :return: set of group ids
+        """
+        groups = self.vk.groups.get(user_id=uid, count=1000)
+        return set(groups['items'])
