@@ -1,6 +1,7 @@
 import vk_api
 import requests
 import datetime
+from time import sleep
 
 
 class VkontakteApi:
@@ -18,9 +19,12 @@ class VkontakteApi:
     Methods:
         get_user_info: gets info on VK user based in his id
         determinate_search_parameters: staticmethod, returns parameters for search (same age, city and opposite gender)
+        filter_search_results: clears list of users info from users with closed profiles, without full birthdate and
+        city indication
         search_people: gets list of VK users with open profiles based on indicated gender, city and age
         search_many_people: same as previous, but uses Vk Request Pool to get more search results
         get_3_photos: gets users profile and marked photos and takes three most liked of them
+        prepare_found_users_info: prepares list of users dicts from API to necessary for database form
         like_photo: likes requested photo by token user
         delete_like_photo: deletes likes from requested photo by token user
         check_like_presence: checks whether photo is liked by token user or not
@@ -107,6 +111,17 @@ class VkontakteApi:
 
         return [search_city_id, search_gender_id, search_age]
 
+    @staticmethod
+    def filter_search_results(found_users: list) -> list:
+        """
+        Clears list of users info from users with closed profiles, without full birthdate and city indication
+        :param found_users: list of found users
+        :return: filtered list of found users
+        """
+        return [person for person in found_users if not person['is_closed']
+                                                    and 'city' in person
+                                                    and 'bdate' in person and len(person['bdate'].split('.')) > 2]
+
     def search_people(self, city_id: int, sex: int, age: int) -> list:
         """
         Gets list of VK users with open profiles based on indicated gender, city and age
@@ -116,13 +131,11 @@ class VkontakteApi:
         :return: list of dicts with users information
         """
 
-        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=100,
+        response = self.vk.users.search(city=city_id, sex=sex, age_from=age, age_to=age, count=20,
                                         fields='''activities, bdate, books, city, games, interests, movies, 
                                         music, personal, relation, sex, tv''')
 
-        return [person for person in response['items'] if not person['is_closed']
-                                                       and 'city' in person
-                                                       and 'bdate' in person and len(person['bdate'].split('.')) > 2]
+        return self.filter_search_results(response['items'])
 
     def search_many_people(self, city_id: int, sex: int, age: int) -> list:
         """
@@ -150,9 +163,7 @@ class VkontakteApi:
         for value in people.values():
             people_list.extend(value.result['items'])
 
-        return [person for person in people_list if not person['is_closed']
-                                                 and 'city' in person
-                                                 and 'bdate' in person and len(person['bdate'].split('.')) > 2]
+        return self.filter_search_results(people_list)
 
     def get_3_photos(self, user_id: int) -> list:
         """
@@ -192,6 +203,55 @@ class VkontakteApi:
 
         return [photo[0] for photo in three_photos]
 
+    def prepare_found_users_info(self, found_users: list) -> list:
+        """
+        Prepares list of users dicts from API to necessary for database form
+        :param found_users: list of dicts with found users info
+        :return: list of dicts with prepared users info
+        """
+        result = []
+        for person in found_users:
+
+            photos = self.get_3_photos(person['id'])
+            sleep(0.34)
+
+            if len(photos) < 3:
+                continue
+
+            user_gender_id = person['sex']
+            if user_gender_id == 1:
+                user_gender_title = 'женский'
+            else:
+                user_gender_title = 'мужской'
+
+            birth_day = person['bdate'].split('.')
+            user_birthday_date = datetime.date(int(birth_day[2]), int(birth_day[1]), int(birth_day[0]))
+            user_age = int((datetime.date.today() - user_birthday_date).days // 365.25)
+
+            person_info = {'last_name': person['last_name'],
+                           'first_name': person['first_name'],
+                           'id_user': person['id'],
+                           'city': person['city']['id'],
+                           'city_title': person['city']['title'],
+                           'gender': person['sex'],
+                           'gender_title': user_gender_title,
+                           'age': user_age, 'photos': photos,
+                           'middle_name': None,
+                           'activities': person.get('activities'),
+                           'books': person.get('books'),
+                           'games': person.get('games'),
+                           'interests': person.get('interests'),
+                           'movies': person.get('movies'),
+                           'music': person.get('music'),
+                           'personal': person.get('personal'),
+                           'relation': person.get('relation'),
+                           'tv': person.get('tv')
+                           }
+
+            result.append(person_info)
+
+        return result
+
     def like_photo(self, owner_id: int, photo_id: int) -> bool:
         """
         Likes requested photo by token user
@@ -202,10 +262,7 @@ class VkontakteApi:
         """
         try:
             response = self.vk.likes.add(type='photo', owner_id=owner_id, item_id=photo_id)
-            if 'likes' in response:
-                return True
-            else:
-                return False
+            return 'likes' in response
         except vk_api.exceptions.ApiError:
             return False
 
@@ -219,10 +276,7 @@ class VkontakteApi:
         """
 
         response = self.vk.likes.delete(type='photo', owner_id=owner_id, item_id=photo_id)
-        if 'likes' in response:
-            return True
-        else:
-            return False
+        return 'likes' in response
 
     def check_like_presence(self, photo: str) -> bool:
         """
@@ -232,10 +286,7 @@ class VkontakteApi:
         """
         try:
             response = self.vk.photos.getById(photos=photo, extended=1)
-            if response[0]['likes']['user_likes']:
-                return True
-            else:
-                return False
+            return bool(response[0]['likes']['user_likes'])
         except vk_api.exceptions.ApiError:
             return False
 

@@ -5,7 +5,6 @@ import sqlalchemy
 from psycopg2 import Error
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from sqlalchemy.orm import sessionmaker
-from pprint import pprint
 
 from DB.models import User, FoundUser, City, Gender, BlackList, Favorites, Photo, create_tables
 
@@ -114,8 +113,6 @@ class DB:
             res = create_tables(engine)
             if res:
                 return True
-            else:
-                raise
         except:
             return False
 

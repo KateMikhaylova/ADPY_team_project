@@ -1,29 +1,21 @@
 import vk_api
-from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
 
 from VK.vkontakte import VkontakteApi
 from DB.database import DB
 from interests.interests import InterestsComparison
+import keyboard.keyboard as kb
 
-import datetime
-from time import sleep
 import nltk
 from nltk.corpus import stopwords
 
 
-class BotApi(VkontakteApi, DB):
+class BotApi:
     """
-    Class for Vkontakte bot (inherited from VkontakteAPI to call its methods and from DB class to work with database)
+    Class for Vkontakte bot
 
     Attributes:
-        user_token: str
-                    users token used to get access to VkApi methods
-        vk_session: class vk_api.vk_api.VkApi object
-                    used to create vk attribute and to create VkRequestsPool object
-        vk:         class vk_api.vk_api.VkApiMethod object
-                    used to call VkApi methods
         bot_token:  str
                     bot token used to send messages in group chat on behalf of the group
         bot_session:class vk_api.vk_api.VkApi object
@@ -32,15 +24,13 @@ class BotApi(VkontakteApi, DB):
                     used to send keyboards to bot user
         longpool:   class vk_api.longpoll.VkLongPoll object
                     used to perform bot permanent run
-        info:       dict to create DSN for database connection
-        engine:     engine to work with database
-        connection: connection with database via psycopg2 in order to create new database if necessary
-        cursor:     psycopg2 connection cursor
         search_parameters:  attribute to store each bot users search parameters while they are prepared before sending
                             to search method
         select_dict:        attribute to save each bot users select results and position on watching through them
         current_photos:     attribute to save each bot users current showing mate, needed to action with photos
         interests:          attribute for class InterestsComparison object to call this class methods
+        apivk:              attribute for class VkontakteApi object to call this class methods
+        db:                 attribute for class DB object to call this class methods
 
     Methods:
         execute_beginning: executes Begin command
@@ -59,6 +49,7 @@ class BotApi(VkontakteApi, DB):
         send_any_msg: sends message to user with any text
         send_person_msg: sends message to user wth mate name, surname link and photos
         send_empty_keyboard: sends empty keyboard to user (deletes previous active keyboard)
+        send_favourite_start_keyboard: sends keyboard with show favourite and next buttons
         send_search_keyboard: sends search keyboard to user
         send_start_keyboard: sends start keyboard to user
         send_age_city_keyboard: sends age and city choose keyboard to user
@@ -70,14 +61,12 @@ class BotApi(VkontakteApi, DB):
 
     def __init__(self, user_token: str, bot_token: str, **info: dict) -> None:
         """
-        Sets attributes user_token, vk_session, vk, bot_token, bot_session, bot, longpool, info, engine,
-        search_parameters, select_dict and current_photos for object BotApi
+        Sets attributes bot_token, bot_session, bot, longpool, search_parameters, select_dict, current_photos,
+        interests, apivk, db for object BotApi
         :param user_token: str, users token with necessary rights ('wall' rights are obligatory)
         :param bot_token: str, bot token of the community
+        :param info: info for database connection
         """
-
-        VkontakteApi.__init__(self, user_token)
-        DB.__init__(self, **info)
         self.bot_token = bot_token
         self.bot_session = vk_api.VkApi(token=self.bot_token)
         self.bot = self.bot_session.get_api()
@@ -86,6 +75,8 @@ class BotApi(VkontakteApi, DB):
         self.select_dict = dict()
         self.current_photos = dict()
         self.interests = InterestsComparison()
+        self.apivk = VkontakteApi(user_token)
+        self.db = DB(**info)
 
     def execute_beginning(self, uid: int) -> bool:
         """
@@ -93,9 +84,7 @@ class BotApi(VkontakteApi, DB):
         :param uid: user id
         :return:
         """
-
         self.send_start_keyboard(uid)
-
         return True
 
     def execute_help(self, uid: int) -> bool:
@@ -105,7 +94,6 @@ class BotApi(VkontakteApi, DB):
         :param uid: user id
         :return:
         """
-
         if uid not in self.select_dict and uid not in self.current_photos:
             self.send_start_keyboard(uid)
 
@@ -126,13 +114,12 @@ class BotApi(VkontakteApi, DB):
         :param uid: user id
         :return:
         """
-
         if uid not in self.select_dict and uid not in self.current_photos:
 
-            user_info = self.get_user_info(uid)
-            self.write_user(user_info)
+            user_info = self.apivk.get_user_info(uid)
+            self.db.write_user(user_info)
 
-            search_info = self.determinate_search_parameters(user_info)
+            search_info = self.apivk.determinate_search_parameters(user_info)
             self.search_parameters[uid] = search_info
 
             if search_info[0] and search_info[2]:
@@ -165,7 +152,6 @@ class BotApi(VkontakteApi, DB):
         :param message_command: button age command (mask 'Возраст ...')
         :return:
         """
-
         if uid in self.search_parameters and self.search_parameters[uid][2] is None:
 
             try:
@@ -196,21 +182,11 @@ class BotApi(VkontakteApi, DB):
         :param message_command: button city command (mask 'г. ...')
         :return:
         """
-
         if uid in self.search_parameters and self.search_parameters[uid][0] is None:
 
             city_title = message_command.split()[-1]
-            city_dict = {'москва': 1,
-                         'санкт-петербург': 2,
-                         'казань': 60,
-                         'ростов-на-дону': 119,
-                         'махачкала': 85,
-                         'екатеринбург': 49,
-                         'новосибирск': 99,
-                         'норильск': 102,
-                         'владивосток': 37,
-                         'якутск': 168,
-                         }
+            city_dict = {'москва': 1, 'санкт-петербург': 2, 'казань': 60, 'ростов-на-дону': 119, 'махачкала': 85,
+                         'екатеринбург': 49, 'новосибирск': 99, 'норильск': 102, 'владивосток': 37, 'якутск': 168}
             city_id = city_dict.get(city_title)
             self.search_parameters[uid][0] = city_id
             return True
@@ -237,7 +213,6 @@ class BotApi(VkontakteApi, DB):
         :param uid: user id
         :return:
         """
-
         if uid in self.select_dict and uid in self.current_photos:
             text = '''Вы уже произвели поиск. 
             Вы можете произвести действия с последним полученным пользователем или перейти к следующему'''
@@ -250,61 +225,20 @@ class BotApi(VkontakteApi, DB):
             return False
 
         search_info = self.search_parameters[uid][:]
-        search_info_dict = {'gender': search_info[1],
-                            'city': search_info[0],
-                            'age': search_info[2]
-                            }
+        search_info_dict = {'gender': search_info[1], 'city': search_info[0], 'age': search_info[2]}
 
         if search_info[0] and search_info[2]:
             self.send_empty_keyboard(uid, 'Начинаю поиск')
             del(self.search_parameters[uid])
 
-            people_list = self.search_people(*search_info)
-            # people_list = self.search_many_people(*search_info)
+            people_list = self.apivk.search_people(*search_info)
+            # people_list = self.apivk.search_many_people(*search_info)
             # поиск с большим кол-вом результатов, при поиске фото по всем этим людям возможен таймаут
-
+            people_list = self.apivk.prepare_found_users_info(people_list)
             for person in people_list:
+                self.db.write_found_user(person)
 
-                photos = self.get_3_photos(person['id'])
-                sleep(0.34)
-
-                if len(photos) < 3:
-                    continue
-
-                user_gender_id = person['sex']
-                if user_gender_id == 1:
-                    user_gender_title = 'женский'
-                else:
-                    user_gender_title = 'мужской'
-
-                birth_day = person['bdate'].split('.')
-                user_birthday_date = datetime.date(int(birth_day[2]), int(birth_day[1]), int(birth_day[0]))
-                user_age = int((datetime.date.today() - user_birthday_date).days // 365.25)
-
-                person_info = {'last_name': person['last_name'],
-                               'first_name': person['first_name'],
-                               'id_user': person['id'],
-                               'city': person['city']['id'],
-                               'city_title': person['city']['title'],
-                               'gender': person['sex'],
-                               'gender_title': user_gender_title,
-                               'age': user_age,
-                               'photos': photos,
-                               'middle_name': None,
-                               'activities': person.get('activities'),
-                               'books': person.get('books'),
-                               'games': person.get('games'),
-                               'interests': person.get('interests'),
-                               'movies': person.get('movies'),
-                               'music': person.get('music'),
-                               'personal': person.get('personal'),
-                               'relation': person.get('relation'),
-                               'tv': person.get('tv')
-                               }
-
-                self.write_found_user(person_info)
-
-            select_result = self.read_found_user(uid, search_info_dict)
+            select_result = self.db.read_found_user(uid, search_info_dict)
 
             if not select_result:
                 self.send_any_msg(uid, 'В базе пока нет для вас пары. Возвращайтесь позже, база все время обновляется')
@@ -315,7 +249,7 @@ class BotApi(VkontakteApi, DB):
             self.select_dict[uid] = [0, select_result]
             first_person = self.select_dict[uid][1][self.select_dict[uid][0]]
 
-            first_person_photos = self.query_photo(first_person['id_user'])
+            first_person_photos = self.db.query_photo(first_person['id_user'])
             self.current_photos[uid] = first_person_photos
 
             self.send_person_msg(uid, first_person['id_user'],
@@ -345,7 +279,7 @@ class BotApi(VkontakteApi, DB):
         :param found_users: list of found users
         :return: sorted list of found users
         """
-        user_dict = self.read_user(uid)[0]
+        user_dict = self.db.read_user(uid)[0]
 
         nltk.download('stopwords')  # line may be commented after first launch to avoid download warning in console
         all_stopwords = stopwords.words("russian") + stopwords.words("english")
@@ -387,10 +321,10 @@ class BotApi(VkontakteApi, DB):
             count += self.interests.compare_smoking_alcohol(user_dict['smoking'], found_user['smoking'])
             count += self.interests.compare_smoking_alcohol(user_dict['alcohol'], found_user['alcohol'])
 
-            mutual_friends = self.get_mutual_friends(user_dict['id_user'], found_user['id_user'])
+            mutual_friends = self.apivk.get_mutual_friends(user_dict['id_user'], found_user['id_user'])
             count += self.interests.evaluate_mutual_friends(mutual_friends)
 
-            mutual_groups = self.get_groups(user_dict['id_user']) & self.get_groups(found_user['id_user'])
+            mutual_groups = self.apivk.get_groups(user_dict['id_user']) & self.apivk.get_groups(found_user['id_user'])
             count += self.interests.evaluate_mutual_groups(mutual_groups)
 
             result.append([count, found_user])
@@ -408,13 +342,12 @@ class BotApi(VkontakteApi, DB):
         :param uid: user id
         :return:
         """
-
         if uid in self.select_dict and uid in self.current_photos:
             self.select_dict[uid][0] += 1
 
             if self.select_dict[uid][0] < len(self.select_dict[uid][1]):
                 next_person = self.select_dict[uid][1][self.select_dict[uid][0]]
-                next_person_photos = self.query_photo(next_person['id_user'])
+                next_person_photos = self.db.query_photo(next_person['id_user'])
                 self.current_photos[uid] = next_person_photos
 
                 self.send_person_msg(uid, next_person['id_user'], next_person['first_name'], next_person['last_name'],
@@ -426,17 +359,8 @@ class BotApi(VkontakteApi, DB):
 
                 del(self.select_dict[uid])
                 del(self.current_photos[uid])
+                self.send_favourite_start_keyboard(uid)
 
-                keyboard = VkKeyboard(one_time=False)
-                keyboard.add_button('посмотреть избранных', color=VkKeyboardColor.SECONDARY)
-                keyboard.add_line()
-                keyboard.add_button('start', color=VkKeyboardColor.SECONDARY)
-                self.bot.messages.send(peer_id=uid,
-                                       random_id=get_random_id(),
-                                       keyboard=keyboard.get_keyboard(),
-                                       message=f'''Вы посмотрели всех подобранных пользователей.
-Можете посмотреть избранных пользователей или начать заново.
-Благодарим за использование бота''')
                 return False
 
         else:
@@ -453,12 +377,11 @@ class BotApi(VkontakteApi, DB):
         :param photo_number: photo number (1, 2 or 3)
         :return:
         """
-
         if uid in self.current_photos:
             three_photos = self.current_photos[uid]
             photo = three_photos[photo_number-1]
             owner_id, photo_id = photo.split('_')
-            self.like_photo(owner_id, photo_id)
+            self.apivk.like_photo(owner_id, photo_id)
             return True
 
         else:
@@ -476,13 +399,12 @@ class BotApi(VkontakteApi, DB):
         :param photo_number: photo number (1, 2 or 3)
         :return:
         """
-
         if uid in self.current_photos:
             three_photos = self.current_photos[uid]
             photo = three_photos[photo_number - 1]
             owner_id, photo_id = photo.split('_')
-            if self.check_like_presence(photo):
-                self.delete_like_photo(owner_id, photo_id)
+            if self.apivk.check_like_presence(photo):
+                self.apivk.delete_like_photo(owner_id, photo_id)
                 return True
             return False
         else:
@@ -498,10 +420,9 @@ class BotApi(VkontakteApi, DB):
         :param uid: user id
         :return:
         """
-
         if uid in self.select_dict:
             current_person = self.select_dict[uid][1][self.select_dict[uid][0]]
-            self.add_to_favourite(uid, current_person['id_user'])
+            self.db.add_to_favourite(uid, current_person['id_user'])
             return True
 
         else:
@@ -516,8 +437,7 @@ class BotApi(VkontakteApi, DB):
         :param uid: user id
         :return:
         """
-
-        favourites = self.query_favourite(uid)
+        favourites = self.db.query_favourite(uid)
 
         text = ''
         for favourite in favourites:
@@ -538,11 +458,10 @@ class BotApi(VkontakteApi, DB):
         :param uid: use id
         :return:
         """
-
         if uid in self.select_dict:
             current_person = self.select_dict[uid][1][self.select_dict[uid][0]]
-            self.add_to_blacklist(uid, current_person['id_user'])
-            self.delete_from_favourites(uid, current_person['id_user'])
+            self.db.add_to_blacklist(uid, current_person['id_user'])
+            self.db.delete_from_favourites(uid, current_person['id_user'])
             return True
 
         else:
@@ -558,7 +477,6 @@ class BotApi(VkontakteApi, DB):
         :param text: text message
         :return:
         """
-
         self.bot_session.method('messages.send', {'user_id': uid, 'message': text, 'random_id': get_random_id()})
         return True
 
@@ -575,7 +493,6 @@ class BotApi(VkontakteApi, DB):
         :param photo3: users third photo id
         :return:
         """
-
         message = f'''{name} {surname}
 https://vk.com/id{person_id}    
         '''
@@ -591,11 +508,20 @@ https://vk.com/id{person_id}
         :param message: message text
         :return:
         """
-
-        self.bot.messages.send(peer_id=uid,
-                               random_id=get_random_id(),
-                               keyboard=VkKeyboard.get_empty_keyboard(),
+        self.bot.messages.send(peer_id=uid, random_id=get_random_id(), keyboard=kb.create_empty_keyboard(),
                                message=message)
+        return True
+
+    def send_favourite_start_keyboard(self, uid: int) -> bool:
+        """
+        Sends keyboard with show favourite and start buttons
+        :param uid: user id
+        :return:
+        """
+        self.bot.messages.send(peer_id=uid, random_id=get_random_id(), keyboard=kb.create_favourite_start_keyboard(),
+                               message=f'''Вы посмотрели всех подобранных пользователей.
+Можете посмотреть избранных пользователей или начать заново.
+Благодарим за использование бота''')
         return True
 
     def send_search_keyboard(self, uid: int) -> bool:
@@ -604,12 +530,7 @@ https://vk.com/id{person_id}
         :param uid: user id
         :return:
         """
-
-        keyboard = VkKeyboard(one_time=True)
-        keyboard.add_button('search', color=VkKeyboardColor.SECONDARY)
-        self.bot.messages.send(peer_id=uid,
-                               random_id=get_random_id(),
-                               keyboard=keyboard.get_keyboard(),
+        self.bot.messages.send(peer_id=uid, random_id=get_random_id(), keyboard=kb.create_search_keyboard(),
                                message=f'''Мы собираемся поискать для вас пользователей вашего возраста, 
 противоположного пола, проживающих в вашем городе.
 Нажмите кнопку search, чтобы начать поиск''')
@@ -621,12 +542,7 @@ https://vk.com/id{person_id}
         :param uid: user id
         :return:
         """
-
-        keyboard = VkKeyboard(one_time=True)
-        keyboard.add_button('start', color=VkKeyboardColor.SECONDARY)
-        self.bot.messages.send(peer_id=uid,
-                               random_id=get_random_id(),
-                               keyboard=keyboard.get_keyboard(),
+        self.bot.messages.send(peer_id=uid, random_id=get_random_id(), keyboard=kb.create_start_keyboard(),
                                message=f'''Вас приветствует бот для знакомств VKinder.
 Для начала работы просто нажмите start.''')
         return True
@@ -637,41 +553,8 @@ https://vk.com/id{person_id}
         :param uid: user id
         :return:
         """
-
-        keyboard = VkKeyboard(one_time=False)
-        keyboard.add_button('возраст 20', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('возраст 25', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('возраст 30', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('возраст 35', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('возраст 40', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('возраст 45', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('возраст 50', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('возраст 60', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('возраст 70', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('г. Москва', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('г. Санкт-Петербург', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('г. Казань', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('г. Ростов-на-Дону', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('г. Махачкала', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('г. Екатеринбург', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('г. Новосибирск', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('г. Норильск', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('г. Владивосток', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('г. Якутск', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('search', color=VkKeyboardColor.PRIMARY)
-        self.bot.messages.send(peer_id=uid,
-                               random_id=get_random_id(),
-                               keyboard=keyboard.get_keyboard(),
-                               message=f'''
-У вас не указана или скрыта дата рождения и город проживания.
+        self.bot.messages.send(peer_id=uid, random_id=get_random_id(), keyboard=kb.create_age_city_keyboard(),
+                               message=f'''У вас не указана или скрыта дата рождения и город проживания.
 Отредактируйте личные данные для наиболее точного поиска или
 выберите возраст, город для поиска, после чего нажмите search''')
         return True
@@ -682,26 +565,8 @@ https://vk.com/id{person_id}
         :param uid: user id
         :return:
         """
-
-        keyboard = VkKeyboard(one_time=False)
-        keyboard.add_button('возраст 20', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('возраст 25', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('возраст 30', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('возраст 35', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('возраст 40', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('возраст 45', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('возраст 50', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('возраст 60', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('возраст 70', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('search', color=VkKeyboardColor.PRIMARY)
-        self.bot.messages.send(peer_id=uid,
-                               random_id=get_random_id(),
-                               keyboard=keyboard.get_keyboard(),
-                               message=f'''
-У вас не указана или скрыта дата рождения.
+        self.bot.messages.send(peer_id=uid, random_id=get_random_id(), keyboard=kb.create_age_keyboard(),
+                               message=f'''У вас не указана или скрыта дата рождения.
 Отредактируйте личные данные для наиболее точного поиска или
 выберите возраст для поиска, после чего нажмите search''')
         return True
@@ -712,29 +577,8 @@ https://vk.com/id{person_id}
         :param uid: user id
         :return:
         """
-
-        keyboard = VkKeyboard(one_time=False)
-        keyboard.add_button('г. Москва', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('г. Санкт-Петербург', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('г. Казань', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('г. Ростов-на-Дону', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('г. Махачкала', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('г. Екатеринбург', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('г. Новосибирск', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('г. Норильск', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('г. Владивосток', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('г. Якутск', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_line()
-        keyboard.add_button('search', color=VkKeyboardColor.PRIMARY)
-        self.bot.messages.send(peer_id=uid,
-                               random_id=get_random_id(),
-                               keyboard=keyboard.get_keyboard(),
-                               message=f'''
-У вас не указан или скрыт город проживания.
+        self.bot.messages.send(peer_id=uid, random_id=get_random_id(), keyboard=kb.create_city_keyboard(),
+                               message=f'''У вас не указан или скрыт город проживания.
 Отредактируйте личные данные для наиболее точного поиска или
 выберите город для поиска, после чего нажмите search''')
         return True
@@ -745,24 +589,7 @@ https://vk.com/id{person_id}
         :param uid: user id
         :return:
         """
-
-        keyboard = VkKeyboard(one_time=False)
-        keyboard.add_button('лайк фото 1', color=VkKeyboardColor.POSITIVE)
-        keyboard.add_button('лайк фото 2', color=VkKeyboardColor.POSITIVE)
-        keyboard.add_button('лайк фото 3', color=VkKeyboardColor.POSITIVE)
-        keyboard.add_line()
-        keyboard.add_button('не лайк фото 1', color=VkKeyboardColor.NEGATIVE)
-        keyboard.add_button('не лайк фото 2', color=VkKeyboardColor.NEGATIVE)
-        keyboard.add_button('не лайк фото 3', color=VkKeyboardColor.NEGATIVE)
-        keyboard.add_line()
-        keyboard.add_button('в избранное', color=VkKeyboardColor.POSITIVE)
-        keyboard.add_button('посмотреть избранных', color=VkKeyboardColor.SECONDARY)
-        keyboard.add_button('в черный список', color=VkKeyboardColor.NEGATIVE)
-        keyboard.add_line()
-        keyboard.add_button('next', color=VkKeyboardColor.PRIMARY)
-        self.bot.messages.send(peer_id=uid,
-                               random_id=get_random_id(),
-                               keyboard=keyboard.get_keyboard(),
+        self.bot.messages.send(peer_id=uid, random_id=get_random_id(), keyboard=kb.create_next_keyboard(),
                                message=f'''
 Вы можете лайкнуть любую из фотографий, отменить лайк, добавить пользователя в избранное, 
 в черный список, посмотреть избранное или перейти к следующему пользователю''')
@@ -773,13 +600,12 @@ https://vk.com/id{person_id}
         Creates database and/or tables and performs bot permanent work
         :return:
         """
-
-        engine = self.preparation()
-        test_create = self.create_table(engine)
+        engine = self.db.preparation()
+        test_create = self.db.create_table(engine)
         if not test_create:
-            test_new_db = self.new_database()
+            test_new_db = self.db.new_database()
             if test_new_db:
-                self.create_table(engine)
+                self.db.create_table(engine)
             else:
                 print(test_new_db)
                 print('НИЧЕГО НЕ РАБОТАЕТ!')
