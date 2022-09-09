@@ -5,6 +5,7 @@ import sqlalchemy
 from psycopg2 import Error
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from sqlalchemy.orm import sessionmaker
+from pprint import pprint
 
 from DB.models import User, FoundUser, City, Gender, BlackList, Favorites, Photo, create_tables
 
@@ -142,13 +143,48 @@ class DB:
         if not self.__query_user(person):
             Session = sessionmaker(bind=self.engine)
             session = Session()
-            query = User(id=person['id'],
-                         first_name=person['first_name'],
-                         last_name=person['last_name'],
-                         middle_name=person['middle_name'],
-                         id_gender=person['gender'],
-                         id_city=person['city'],
-                         age=person['age'])
+            if 'personal' in person and person['personal'] and person['personal'] is not None:
+                query = User(id=person['id'],
+                             first_name=person['first_name'],
+                             last_name=person['last_name'],
+                             middle_name=person['middle_name'],
+                             id_gender=person['gender'],
+                             id_city=person['city'],
+                             age=person['age'],
+                             activities=person['activities'],
+                             books=person['books'],
+                             games=person['games'],
+                             interests=person['interests'],
+                             movies=person['movies'],
+                             music=person['music'],
+                             political=person['personal'].get('political'),
+                             religion_id=person['personal'].get('religion_id'),
+                             life_main=person['personal'].get('life_main'),
+                             people_main=person['personal'].get('people_main'),
+                             smoking=person['personal'].get('smoking'),
+                             alcohol=person['personal'].get('alcohol'),
+                             inspired_by=person['personal'].get('inspired_by'),
+                             langs=person['personal'].get('langs'),
+                             relation=person['relation'],
+                             tv=person['tv']
+                             )
+            else:
+                query = User(id=person['id'],
+                             first_name=person['first_name'],
+                             last_name=person['last_name'],
+                             middle_name=person['middle_name'],
+                             id_gender=person['gender'],
+                             id_city=person['city'],
+                             age=person['age'],
+                             activities=person['activities'],
+                             books=person['books'],
+                             games=person['games'],
+                             interests=person['interests'],
+                             movies=person['movies'],
+                             music=person['music'],
+                             relation=person['relation'],
+                             tv=person['tv']
+                             )
             session.add(query)
             session.commit()
             session.close()
@@ -183,13 +219,46 @@ class DB:
         if not self.__query_person(person):
             Session = sessionmaker(bind=self.engine)
             session = Session()
-            query = FoundUser(id=person['id_user'],
-                              first_name=person['first_name'],
-                              last_name=person['last_name'],
-                              middle_name=person['middle_name'],
-                              id_gender=person['gender'],
-                              id_city=person['city'],
-                              age=person['age'])
+            if 'personal' in person and person['personal'] and person['personal'] is not None:
+                query = FoundUser(id=person['id_user'],
+                                  first_name=person['first_name'],
+                                  last_name=person['last_name'],
+                                  middle_name=person['middle_name'],
+                                  id_gender=person['gender'],
+                                  id_city=person['city'],
+                                  age=person['age'],
+                                  activities=person['activities'],
+                                  books=person['books'],
+                                  games=person['games'],
+                                  interests=person['interests'],
+                                  movies=person['movies'],
+                                  music=person['music'],
+                                  political=person['personal'].get('political'),
+                                  religion_id=person['personal'].get('religion_id'),
+                                  life_main=person['personal'].get('life_main'),
+                                  people_main=person['personal'].get('people_main'),
+                                  smoking=person['personal'].get('smoking'),
+                                  alcohol=person['personal'].get('alcohol'),
+                                  inspired_by=person['personal'].get('inspired_by'),
+                                  langs=person['personal'].get('langs'),
+                                  relation=person['relation'],
+                                  tv=person['tv'])
+            else:
+                query = FoundUser(id=person['id_user'],
+                                  first_name=person['first_name'],
+                                  last_name=person['last_name'],
+                                  middle_name=person['middle_name'],
+                                  id_gender=person['gender'],
+                                  id_city=person['city'],
+                                  age=person['age'],
+                                  activities=person['activities'],
+                                  books=person['books'],
+                                  games=person['games'],
+                                  interests=person['interests'],
+                                  movies=person['movies'],
+                                  music=person['music'],
+                                  relation=person['relation'],
+                                  tv=person['tv'])
             session.add(query)
             record_photo = []
             for photo in person['photos']:
@@ -288,7 +357,26 @@ class DB:
             for q in query:
                 result.append({'first_name': q.first_name,
                                'last_name': q.last_name,
-                               'id_user': q.id})
+                               'id_user': q.id,
+                               'city': q.id_city,
+                               'age': q.age,
+                               'activities': q.activities,
+                               'books': q.books,
+                               'games': q.games,
+                               'interests': q.interests,
+                               'movies': q.movies,
+                               'music': q.music,
+                               'political': q.political,
+                               'religion_id': q.religion_id,
+                               'life_main': q.life_main,
+                               'people_main': q.people_main,
+                               'smoking': q.smoking,
+                               'alcohol': q.alcohol,
+                               'inspired_by': q.inspired_by,
+                               'langs': q.langs,
+                               'relation': q.relation,
+                               'tv': q.tv
+                               })
         return result
 
     def read_found_user(self, bot_user_id: int, requirement: dict) -> list:
@@ -318,7 +406,26 @@ class DB:
         for q in query:
             result.append({'first_name': q.first_name,
                            'last_name': q.last_name,
-                           'id_user': q.id})
+                           'id_user': q.id,
+                           'city': q.id_city,
+                           'age': q.age,
+                           'activities': q.activities,
+                           'books': q.books,
+                           'games': q.games,
+                           'interests': q.interests,
+                           'movies': q.movies,
+                           'music': q.music,
+                           'political': q.political,
+                           'religion_id': q.religion_id,
+                           'life_main': q.life_main,
+                           'people_main': q.people_main,
+                           'smoking': q.smoking,
+                           'alcohol': q.alcohol,
+                           'inspired_by': q.inspired_by,
+                           'langs': q.langs,
+                           'relation': q.relation,
+                           'tv': q.tv
+                           })
         return result
 
     def add_to_favourite(self, id_user: int, id_found_user: int) -> bool:
